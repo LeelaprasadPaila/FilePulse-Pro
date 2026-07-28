@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FilePulse Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            text-align: center;
+            padding: 2rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo {
+            font-size: 4rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, #00d2ff, #3a7bd5, #00d2ff);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s ease-in-out infinite;
+            margin-bottom: 0.5rem;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { background-position: 0% center; }
+            50% { background-position: 200% center; }
+        }
+
+        .tagline {
+            font-size: 1.2rem;
+            color: #a0a0c0;
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 2rem;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: #7a7a9a;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+
+        footer {
+            width: 100%;
+            text-align: center;
+            padding: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        footer p {
+            color: #6a6a8a;
+            font-size: 0.85rem;
+            line-height: 1.8;
+        }
+
+        footer .brand {
+            color: #8a8aaa;
+            font-weight: 600;
+        }
+
+        footer .developer {
+            color: #a0a0c0;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">FilePulse Pro</div>
+        <div class="tagline">Intelligent File & PDF Tools</div>
+        <div class="subtitle">Your all-in-one solution for managing, converting, and processing files and PDF documents with speed and precision.</div>
+    </div>
+
+    <footer>
+        <p>© 2026 <span class="brand">FilePulse Pro</span></p>
+        <p>Designed & Developed by</p>
+        <p class="developer">Leela Prasad. Paila</p>
+    </footer>
+</body>
+</html>
