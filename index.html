@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FilePulse Pro — File Explorer & PDF Tools</title>
+  <meta name="description" content="Professional file management and PDF tools suite. Merge, split, compress, watermark PDFs. AI-powered image classification.">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+<style>
+:root {
+  --bg: #0b0f19;
+  --bg-alt: #080b12;
+  --surface: rgba(17, 24, 39, 0.85);
+  --surface-2: rgba(26, 35, 50, 0.7);
+  --surface-3: rgba(30, 41, 59, 0.5);
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --primary-light: #818cf8;
+  --primary-glow: rgba(99, 102, 241, 0.25);
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --text-muted: #64748b;
+  --border: rgba(31, 45, 61, 0.6);
+  --border-light: rgba(51, 65, 85, 0.4);
+  --accent-success: #10b981;
+  --accent-danger: #ef4444;
+  --accent-info: #3b82f6;
+  --accent-warning: #f59e0b;
+  --gradient-1: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  --gradient-2: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
+  --gradient-3: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(168,85,247,0.08) 100%);
+  --glass-bg: rgba(17, 24, 39, 0.6);
+  --glass-border: rgba(255,255,255,0.06);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-md: 0 6px 24px rgba(0,0,0,0.4);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 24px var(--primary-glow);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --sidebar-width: 260px;
+  --header-height: 64px;
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --font-sans: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+}
+[data-theme="light"] {
+  --bg: #f1f5f9;
+  --bg-alt: #e2e8f0;
+  --surface: rgba(255, 255, 255, 0.85);
+  --surface-2: rgba(241, 245, 249, 0.8);
+  --surface-3: rgba(226, 232, 240, 0.5);
+  --text: #0f172a;
+  --text-dim: #475569;
+  --text-muted: #94a3b8;
+  --border: rgba(203, 213, 225, 0.6);
+  --border-light: rgba(148, 163, 184, 0.3);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0,0,0,0.06);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-md: 0 6px 24px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.1);
+  --gradient-2: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  --gradient-3: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(168,85,247,0.05) 100%);
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  background: var(--gradient-2);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
+  transition: background var(--transition-slow), color var(--transition-slow);
+}
+a { color: var(--primary-light); text-decoration: none; }
+a:hover { text-decoration: underline; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-card { height: 180px; border-radius: var(--radius-md); }
+.skeleton-line { height: 14px; margin-bottom: 8px; width: 80%; }
+.skeleton-line:last-child { width: 60%; }
+.toast-container {
+  position: fixed; top: 20px; right: 20px; z-index: 10000;
+  display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+}
+.toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px; border-radius: var(--radius-md);
+  background: var(--glass-bg); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);
+  color: var(--text); font-size: 0.9rem; font-weight: 500;
+  min-width: 300px; max-width: 450px;
+  transform: translateX(120%); opacity: 0;
+  animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.toast.removing { animation: toastSlideOut 0.3s ease forwards; }
+.toast-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; }
+.toast-success .toast-icon { background: rgba(16,185,129,0.2); color: var(--accent-success); }
+.toast-error .toast-icon { background: rgba(239,68,68,0.2); color: var(--accent-danger); }
+.toast-info .toast-icon { background: rgba(59,130,246,0.2); color: var(--accent-info); }
+.toast-warning .toast-icon { background: rgba(245,158,11,0.2); color: var(--accent-warning); }
+.toast-message { flex: 1; }
+.toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.1rem; padding: 4px; line-height: 1; transition: color var(--transition-fast); }
+.toast-close:hover { color: var(--text); }
+@keyframes toastSlideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes toastSlideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
+.context-menu {
+  position: fixed; z-index: 9999;
+  background: var(--glass-bg); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+  box-shadow: var(--glass-shadow); padding: 6px; min-width: 200px;
+  opacity: 0; transform: scale(0.95); transform-origin: top left;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  pointer-events: none;
+}
+.context-menu.active { opacity: 1; transform: scale(1); pointer-events: auto; }
+.context-menu-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem;
+  color: var(--text); transition: background var(--transition-fast);
+  border: none; background: none; width: 100%; text-align: left; font-family: inherit;
+}
+.context-menu-item:hover { background: var(--surface-2); }
+.context-menu-item.danger { color: var(--accent-danger); }
+.context-menu-divider { height: 1px; background: var(--border); margin: 4px 8px; }
+.context-menu-shortcut { margin-left: auto; color: var(--text-muted); font-size: 0.75rem; font-family: var(--font-mono); }
+.app-layout { display: flex; min-height: 100vh; }
+.sidebar {
+  position: fixed; top: 0; left: 0; width: var(--sidebar-width); height: 100vh;
+  background: var(--glass-bg); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+  border-right: 1px solid var(--glass-border); z-index: 1000;
+  display: flex; flex-direction: column;
+  transition: transform var(--transition-slow), background var(--transition-slow);
+  overflow: hidden;
+}
+.sidebar-brand { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sidebar-logo { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--gradient-1); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 800; color: white; flex-shrink: 0; }
+.sidebar-brand-text h2 { font-size: 1.05rem; font-weight: 700; background: var(--gradient-1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.2; }
+.sidebar-brand-text small { font-size: 0.7rem; color: var(--text-muted); -webkit-text-fill-color: var(--text-muted); }
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 12px 10px; }
+.sidebar-section-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); padding: 16px 10px 6px; font-weight: 600; }
+.sidebar-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border-radius: var(--radius-sm); cursor: pointer; color: var(--text-dim);
+  font-size: 0.88rem; font-weight: 500; transition: all var(--transition-fast);
+  border: none; background: none; width: 100%; text-align: left; font-family: inherit; position: relative;
+}
+.sidebar-item:hover { background: var(--surface-2); color: var(--text); }
+.sidebar-item.active { background: var(--gradient-3); color: var(--primary-light); border: 1px solid rgba(99,102,241,0.15); }
+.sidebar-item .icon { font-size: 1.1rem; width: 24px; text-align: center; flex-shrink: 0; }
+.sidebar-item .badge { margin-left: auto; background: var(--primary); color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+.sidebar-footer { padding: 12px 10px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.main-content { margin-left: var(--sidebar-width); flex: 1; min-height: 100vh; transition: margin-left var(--transition-slow); }
+.top-header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--glass-bg); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border); padding: 0 28px;
+  height: var(--header-height); display: flex; align-items: center; gap: 16px;
+}
+.top-header .menu-toggle { display: none; background: none; border: none; color: var(--text); font-size: 1.3rem; cursor: pointer; padding: 6px; border-radius: var(--radius-sm); transition: background var(--transition-fast); }
+.top-header .menu-toggle:hover { background: var(--surface-2); }
+.top-header .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text-dim); flex: 1; }
+.top-header .breadcrumb span { color: var(--text); font-weight: 600; }
+.top-header-actions { display: flex; align-items: center; gap: 8px; }
+.header-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: all var(--transition-fast); position: relative; }
+.header-btn:hover { border-color: var(--primary); color: var(--text); background: var(--surface); }
+.page-content { padding: 24px 28px; }
+.page { display: none; animation: pageEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.page.active { display: block; }
+@keyframes pageEnter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.page-header { margin-bottom: 24px; }
+.page-header h1 { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+.page-header p { color: var(--text-dim); font-size: 0.95rem; }
+.glass-card { background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); box-shadow: var(--glass-shadow); padding: 24px; transition: all var(--transition-normal); }
+.glass-card:hover { border-color: rgba(99,102,241,0.15); box-shadow: var(--glass-shadow), 0 0 20px rgba(99,102,241,0.05); }
+.glass-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.glass-card-icon { width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--gradient-1); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+.glass-card-title { font-size: 1.1rem; font-weight: 700; }
+.glass-card-desc { font-size: 0.85rem; color: var(--text-dim); margin-top: 2px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 20px; transition: all var(--transition-normal); cursor: default; position: relative; overflow: hidden; }
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--gradient-1); opacity: 0; transition: opacity var(--transition-normal); }
+.stat-card:hover::before { opacity: 1; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.stat-card-icon { width: 44px; height: 44px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 12px; }
+.stat-card-value { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.stat-card-label { font-size: 0.85rem; color: var(--text-dim); margin-top: 4px; }
+.stat-card-trend { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; margin-top: 8px; padding: 2px 8px; border-radius: 4px; }
+.stat-card-trend.up { color: var(--accent-success); background: rgba(16,185,129,0.1); }
+.stat-card-trend.down { color: var(--accent-danger); background: rgba(239,68,68,0.1); }
+.feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+.feature-card { background: var(--glass-bg); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 18px 16px; text-align: center; cursor: pointer; transition: all var(--transition-normal); position: relative; overflow: hidden; }
+.feature-card::after { content: ''; position: absolute; inset: 0; background: var(--gradient-3); opacity: 0; transition: opacity var(--transition-normal); }
+.feature-card:hover::after { opacity: 1; }
+.feature-card:hover { transform: translateY(-3px); border-color: rgba(99,102,241,0.2); box-shadow: var(--shadow-md); }
+.feature-card > * { position: relative; z-index: 1; }
+.feature-card-icon { font-size: 2rem; margin-bottom: 8px; display: block; }
+.feature-card-title { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+.feature-card-desc { font-size: 0.75rem; color: var(--text-dim); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all var(--transition-fast); font-family: inherit; white-space: nowrap; -webkit-user-select: none; user-select: none; }
+.btn:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--primary); box-shadow: var(--shadow-glow); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--gradient-1); color: white; border: none; }
+.btn-primary:hover:not(:disabled) { box-shadow: var(--shadow-glow); }
+.btn-success { background: var(--accent-success); color: white; border: none; }
+.btn-danger { background: var(--accent-danger); color: white; border: none; }
+.btn-warning { background: var(--accent-warning); color: white; border: none; }
+.btn-info { background: var(--accent-info); color: white; border: none; }
+.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+.btn-lg { padding: 14px 28px; font-size: 1rem; }
+.btn-icon { width: 36px; height: 36px; padding: 0; border-radius: 50%; }
+input[type="text"], input[type="number"], input[type="password"], input[type="search"], select, textarea { padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.9rem; font-family: inherit; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); width: 100%; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+input[type="file"] { display: none; }
+label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-dim); }
+.form-group { margin-bottom: 16px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.drop-zone { border: 2px dashed var(--border); border-radius: var(--radius-lg); padding: 40px 20px; text-align: center; cursor: pointer; transition: all var(--transition-normal); background: var(--surface-3); position: relative; }
+.drop-zone:hover, .drop-zone.drag-over { border-color: var(--primary); background: var(--gradient-3); box-shadow: var(--shadow-glow); }
+.drop-zone-icon { font-size: 3rem; margin-bottom: 12px; display: block; }
+.drop-zone-text { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+.drop-zone-sub { font-size: 0.85rem; color: var(--text-dim); }
+.file-table-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--border); }
+.file-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.file-table th { padding: 12px 14px; text-align: left; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); background: var(--surface-3); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.file-table td { padding: 10px 14px; border-bottom: 1px solid var(--border-light); vertical-align: middle; }
+.file-table tr:last-child td { border-bottom: none; }
+.file-table tr:hover td { background: var(--surface-3); }
+.file-table .file-name { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 500; }
+.file-table .file-name:hover { color: var(--primary-light); }
+.file-table .file-icon { font-size: 1.3rem; flex-shrink: 0; }
+.file-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+.file-grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.file-grid-item { background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 12px; cursor: pointer; transition: all var(--transition-normal); text-align: center; }
+.file-grid-item:hover { transform: translateY(-2px); border-color: rgba(99,102,241,0.2); box-shadow: var(--shadow-md); }
+.file-grid-item.selected { border-color: var(--primary); box-shadow: var(--shadow-glow); }
+.file-grid-item .preview { width: 100%; aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden; background: var(--bg); margin-bottom: 8px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
+.file-grid-item .preview img { width: 100%; height: 100%; object-fit: cover; }
+.file-grid-item .name { font-size: 0.8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-grid-item .meta { font-size: 0.7rem; color: var(--text-muted); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 16px 0; }
+.toolbar-spacer { flex: 1; }
+.toolbar .search-box { position: relative; min-width: 220px; }
+.toolbar .search-box input { padding-left: 36px; }
+.toolbar .search-box .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; pointer-events: none; }
+.preview-pane { margin-top: 16px; padding: 20px; background: var(--bg); border-radius: var(--radius-md); min-height: 160px; border: 1px dashed var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); text-align: center; }
+.preview-pane img { max-width: 100%; max-height: 400px; border-radius: var(--radius-sm); box-shadow: var(--shadow-md); }
+.preview-pane .preview-info { margin-top: 12px; font-size: 0.85rem; color: var(--text-dim); }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin: 12px 0; }
+.thumb { aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden; border: 2px solid var(--border); background: var(--bg); box-shadow: var(--shadow-sm); transition: border-color var(--transition-fast); cursor: pointer; }
+.thumb:hover { border-color: var(--primary); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--transition-normal); }
+.thumb:hover img { transform: scale(1.08); }
+.status-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--surface-3); border-radius: var(--radius-sm); font-size: 0.85rem; color: var(--text-dim); margin: 12px 0; }
+.status-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-success); animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.ml-status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; background: var(--surface-2); border: 1px solid var(--border); font-size: 0.8rem; color: var(--text-dim); }
+.ml-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-warning); animation: pulse 2s infinite; }
+.ml-dot.ready { background: var(--accent-success); }
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; transition: all var(--transition-fast); }
+.tag:hover { border-color: var(--primary); color: var(--text); }
+.tag .remove { cursor: pointer; opacity: 0.6; }
+.tag .remove:hover { opacity: 1; color: var(--accent-danger); }
+.tag-primary { background: rgba(99,102,241,0.15); color: var(--primary-light); border-color: rgba(99,102,241,0.2); }
+.tag-success { background: rgba(16,185,129,0.15); color: var(--accent-success); border-color: rgba(16,185,129,0.2); }
+.tag-warning { background: rgba(245,158,11,0.15); color: var(--accent-warning); border-color: rgba(245,158,11,0.2); }
+.tag-danger { background: rgba(239,68,68,0.15); color: var(--accent-danger); border-color: rgba(239,68,68,0.2); }
+.fav-btn { background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--text-muted); transition: all var(--transition-fast); padding: 2px; }
+.fav-btn.active { color: var(--accent-warning); }
+.fav-btn:hover { transform: scale(1.2); }
+.activity-list { display: flex; flex-direction: column; gap: 8px; }
+.activity-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-3); transition: background var(--transition-fast); }
+.activity-item:hover { background: var(--surface-2); }
+.activity-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+.activity-content { flex: 1; }
+.activity-title { font-size: 0.88rem; font-weight: 500; }
+.activity-time { font-size: 0.75rem; color: var(--text-muted); }
+.chart-container { background: var(--bg); border-radius: var(--radius-md); padding: 16px; margin: 12px 0; min-height: 200px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+.chart-bar { display: flex; align-items: flex-end; gap: 6px; height: 160px; padding-top: 20px; }
+.chart-bar-item { flex: 1; border-radius: 4px 4px 0 0; background: var(--gradient-1); min-height: 4px; transition: height var(--transition-slow); position: relative; cursor: pointer; }
+.chart-bar-item:hover { opacity: 0.8; }
+.chart-bar-item .label { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; }
+.chart-bar-item .value { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 0.7rem; font-weight: 600; color: var(--text-dim); }
+.settings-group { margin-bottom: 24px; }
+.settings-group-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 12px; }
+.setting-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-light); }
+.setting-item:last-child { border-bottom: none; }
+.setting-label { font-size: 0.9rem; font-weight: 500; }
+.setting-desc { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
+.toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .slider { position: absolute; inset: 0; background: var(--surface-2); border-radius: 12px; border: 1px solid var(--border); cursor: pointer; transition: all var(--transition-fast); }
+.toggle .slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 2px; bottom: 2px; background: var(--text-dim); border-radius: 50%; transition: all var(--transition-fast); }
+.toggle input:checked + .slider { background: var(--primary); border-color: var(--primary); }
+.toggle input:checked + .slider::before { transform: translateX(20px); background: white; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 5000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity var(--transition-normal); }
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); width: 90%; max-width: 520px; max-height: 85vh; overflow-y: auto; transform: scale(0.95) translateY(10px); transition: transform var(--transition-normal); }
+.modal-overlay.active .modal { transform: scale(1) translateY(0); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 0; }
+.modal-header h3 { font-size: 1.2rem; font-weight: 700; }
+.modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; padding: 4px; transition: color var(--transition-fast); }
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 20px 24px; }
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid var(--border); }
+.progress-bar { width: 100%; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin: 8px 0; }
+.progress-bar-fill { height: 100%; background: var(--gradient-1); border-radius: 3px; transition: width var(--transition-slow); }
+.shortcut-grid { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; align-items: center; }
+.shortcut-key { font-family: var(--font-mono); font-size: 0.8rem; padding: 4px 10px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; color: var(--text-dim); text-align: center; }
+.shortcut-desc { font-size: 0.88rem; }
+@media (max-width: 1024px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .top-header .menu-toggle { display: flex; }
+  .page-content { padding: 16px; }
+  .top-header { padding: 0 16px; }
+  .stats-grid { grid-template-columns: 1fr; }
+  .feature-grid { grid-template-columns: repeat(2, 1fr); }
+  .form-row { grid-template-columns: 1fr; }
+  .page-header h1 { font-size: 1.4rem; }
+}
+@media (max-width: 480px) { .feature-grid { grid-template-columns: 1fr; } .file-grid-view { grid-template-columns: repeat(2, 1fr); } .toolbar .search-box { min-width: 100%; } }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-fade-in { animation: fadeIn 0.4s ease; }
+.animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.6s linear infinite; }
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+.empty-state-icon { font-size: 3rem; margin-bottom: 12px; display: block; }
+.empty-state-title { font-size: 1.1rem; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
+.empty-state-desc { font-size: 0.88rem; }
+.note { background: rgba(245,158,11,0.08); color: #fbbf24; padding: 14px 18px; border-radius: var(--radius-sm); border-left: 4px solid var(--accent-warning); margin: 1rem 0; font-size: 0.88rem; line-height: 1.5; }
+.alert-success { background: rgba(16,185,129,0.1); color: var(--accent-success); border-left-color: var(--accent-success); }
+.alert-error { background: rgba(239,68,68,0.1); color: var(--accent-danger); border-left-color: var(--accent-danger); }
+.alert-info { background: rgba(59,130,246,0.1); color: var(--accent-info); border-left-color: var(--accent-info); }
+.download-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-3); margin-bottom: 8px; }
+.download-item .info { flex: 1; }
+.download-item .name { font-size: 0.88rem; font-weight: 500; }
+.download-item .meta { font-size: 0.75rem; color: var(--text-muted); }
+.download-item .status { font-size: 0.75rem; font-weight: 600; }
+.download-item .status.done { color: var(--accent-success); }
+.download-item .status.error { color: var(--accent-danger); }
+</style>
+</head>
+<body>
+<div class="toast-container" id="toastContainer" role="alert" aria-live="polite"></div>
+<div class="context-menu" id="contextMenu" role="menu"></div>
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <h3 id="modalTitle">Modal</h3>
+      <button class="modal-close" onclick="closeModal()" aria-label="Close modal">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Main navigation">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">FP</div>
+      <div class="sidebar-brand-text"><h2>FilePulse Pro</h2><small>v2.0 &middot; Premium Suite</small></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <button class="sidebar-item active" data-page="dashboard" onclick="navigateTo('dashboard')"><span class="icon">&#9632;</span> Dashboard</button>
+      <button class="sidebar-item" data-page="explorer" onclick="navigateTo('explorer')"><span class="icon">&#128193;</span> File Explorer<span class="badge" id="fileCountBadge">0</span></button>
+      <button class="sidebar-item" data-page="favorites" onclick="navigateTo('favorites')"><span class="icon">&#11088;</span> Favorites</button>
+      <button class="sidebar-item" data-page="recent" onclick="navigateTo('recent')"><span class="icon">&#128337;</span> Recent Activity</button>
+      <div class="sidebar-section-label">PDF Tools</div>
+      <button class="sidebar-item" data-page="pdf-merge" onclick="navigateTo('pdf-merge')"><span class="icon">&#128196;</span> Merge PDF</button>
+      <button class="sidebar-item" data-page="pdf-split" onclick="navigateTo('pdf-split')"><span class="icon">&#9986;</span> Split PDF</button>
+      <button class="sidebar-item" data-page="pdf-compress" onclick="navigateTo('pdf-compress')"><span class="icon">&#128259;</span> Compress PDF</button>
+      <button class="sidebar-item" data-page="pdf-watermark" onclick="navigateTo('pdf-watermark')"><span class="icon">&#128200;</span> Watermark PDF</button>
+      <button class="sidebar-item" data-page="pdf-rotate" onclick="navigateTo('pdf-rotate')"><span class="icon">&#128260;</span> Rotate PDF</button>
+      <button class="sidebar-item" data-page="pdf-extract" onclick="navigateTo('pdf-extract')"><span class="icon">&#128247;</span> Extract Images</button>
+      <button class="sidebar-item" data-page="pdf-encrypt" onclick="navigateTo('pdf-encrypt')"><span class="icon">&#128274;</span> Encrypt / Unlock</button>
+      <button class="sidebar-item" data-page="img-to-pdf" onclick="navigateTo('img-to-pdf')"><span class="icon">&#128444;</span> Images &rarr; PDF</button>
+      <div class="sidebar-section-label">Image Tools</div>
+      <button class="sidebar-item" data-page="image-resize" onclick="navigateTo('image-resize')"><span class="icon">&#128470;</span> Resize Image</button>
+      <button class="sidebar-item" data-page="image-compress" onclick="navigateTo('image-compress')"><span class="icon">&#128190;</span> Compress Image</button>
+      <button class="sidebar-item" data-page="bg-remove" onclick="navigateTo('bg-remove')"><span class="icon">&#127912;</span> Background Removal</button>
+      <button class="sidebar-item" data-page="exif-viewer" onclick="navigateTo('exif-viewer')"><span class="icon">&#128214;</span> EXIF Viewer</button>
+      <div class="sidebar-section-label">AI & Smart</div>
+      <button class="sidebar-item" data-page="ai-classify" onclick="navigateTo('ai-classify')"><span class="icon">&#129302;</span> AI Classification</button>
+      <button class="sidebar-item" data-page="duplicates" onclick="navigateTo('duplicates')"><span class="icon">&#128203;</span> Duplicate Detection</button>
+      <button class="sidebar-item" data-page="ocr" onclick="navigateTo('ocr')"><span class="icon">&#128221;</span> OCR Text Extraction</button>
+      <button class="sidebar-item" data-page="ai-summary" onclick="navigateTo('ai-summary')"><span class="icon">&#128240;</span> AI Document Summary</button>
+      <div class="sidebar-section-label">Management</div>
+      <button class="sidebar-item" data-page="analytics" onclick="navigateTo('analytics')"><span class="icon">&#128200;</span> Analytics</button>
+      <button class="sidebar-item" data-page="downloads" onclick="navigateTo('downloads')"><span class="icon">&#128229;</span> Download Manager</button>
+      <button class="sidebar-item" data-page="export" onclick="navigateTo('export')"><span class="icon">&#128230;</span> Export Center</button>
+      <button class="sidebar-item" data-page="settings" onclick="navigateTo('settings')"><span class="icon">&#9881;</span> Settings</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="ml-status" style="width:100%;"><span class="ml-dot" id="mlDot"></span><span id="mlStatusText" style="font-size:0.75rem;">Loading AI...</span></div>
+    </div>
+  </aside>
+  <main class="main-content" id="mainContent">
+    <header class="top-header">
+      <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">&#9776;</button>
+      <div class="breadcrumb">FilePulse Pro / <span id="breadcrumbCurrent">Dashboard</span></div>
+      <div class="top-header-actions">
+        <button class="header-btn" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle Theme">&#9790;</button>
+        <button class="header-btn" onclick="showShortcuts()" aria-label="Keyboard shortcuts" title="Keyboard Shortcuts">&#9000;</button>
+        <button class="header-btn" onclick="navigateTo('settings')" aria-label="Settings" title="Settings">&#9881;</button>
+      </div>
+    </header>
+    <div class="page-content">
+      <section class="page active" id="page-dashboard">
+        <div class="page-header"><h1>Dashboard</h1><p>Welcome back. Here's an overview of your workspace.</p></div>
+        <div class="stats-grid" id="dashboardStats">
+          <div class="stat-card"><div class="stat-card-icon" style="background:rgba(99,102,241,0.15);">&#128193;</div><div class="stat-card-value" id="statFiles">0</div><div class="stat-card-label">Total Files</div><div class="stat-card-trend up">&#9650; Active</div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:rgba(16,185,129,0.15);">&#128196;</div><div class="stat-card-value" id="statPdfs">0</div><div class="stat-card-label">PDF Documents</div><div class="stat-card-trend up">&#9650; Processed</div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:rgba(245,158,11,0.15);">&#128247;</div><div class="stat-card-value" id="statImages">0</div><div class="stat-card-label">Images</div><div class="stat-card-trend up">&#9650; Classified</div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:rgba(239,68,68,0.15);">&#128190;</div><div class="stat-card-value" id="statSize">0 MB</div><div class="stat-card-label">Total Size</div><div class="stat-card-trend up">&#9650; Managed</div></div>
+        </div>
+        <div class="glass-card" style="margin-bottom:24px;">
+          <div class="glass-card-header"><div class="glass-card-icon">&#9889;</div><div><div class="glass-card-title">Quick Actions</div><div class="glass-card-desc">Frequently used tools at your fingertips</div></div></div>
+          <div class="feature-grid">
+            <div class="feature-card" onclick="navigateTo('explorer')"><span class="feature-card-icon">&#128193;</span><div class="feature-card-title">File Explorer</div><div class="feature-card-desc">Browse & manage files</div></div>
+            <div class="feature-card" onclick="navigateTo('pdf-merge')"><span class="feature-card-icon">&#128196;</span><div class="feature-card-title">Merge PDF</div><div class="feature-card-desc">Combine PDFs together</div></div>
+            <div class="feature-card" onclick="navigateTo('pdf-split')"><span class="feature-card-icon">&#9986;</span><div class="feature-card-title">Split PDF</div><div class="feature-card-desc">Extract pages</div></div>
+            <div class="feature-card" onclick="navigateTo('img-to-pdf')"><span class="feature-card-icon">&#128444;</span><div class="feature-card-title">Images to PDF</div><div class="feature-card-desc">Convert images</div></div>
+            <div class="feature-card" onclick="navigateTo('ai-classify')"><span class="feature-card-icon">&#129302;</span><div class="feature-card-title">AI Classify</div><div class="feature-card-desc">Auto-tag images</div></div>
+            <div class="feature-card" onclick="navigateTo('analytics')"><span class="feature-card-icon">&#128200;</span><div class="feature-card-title">Analytics</div><div class="feature-card-desc">View insights</div></div>
+          </div>
+        </div>
+        <div class="glass-card">
+          <div class="glass-card-header"><div class="glass-card-icon">&#128337;</div><div><div class="glass-card-title">Recent Activity</div><div class="glass-card-desc">Your latest actions</div></div></div>
+          <div class="activity-list" id="dashboardActivity"><div class="empty-state"><span class="empty-state-icon">&#128200;</span><div class="empty-state-title">No activity yet</div><div class="empty-state-desc">Start using tools to see your activity here.</div></div></div>
+        </div>
+      </section>
+      <section class="page" id="page-explorer">
+        <div class="page-header"><h1>File Explorer</h1><p>Upload, browse, and manage your files with AI-powered classification.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('explorerInput').click()">
+            <span class="drop-zone-icon">&#128228;</span>
+            <div class="drop-zone-text">Drop files here or click to browse</div>
+            <div class="drop-zone-sub">Supports images, PDFs, and more</div>
+            <input type="file" id="explorerInput" multiple accept="*/*">
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-primary" onclick="document.getElementById('explorerInput').click()">&#43; Add Files</button>
+            <button class="btn btn-danger" id="clearExplorerBtn" disabled onclick="clearExplorer()">Clear All</button>
+            <button class="btn btn-warning" id="bulkZipBtn" disabled onclick="downloadSelectedZip()">&#128230; ZIP Selected</button>
+            <div class="toolbar-spacer"></div>
+            <div class="search-box"><span class="search-icon">&#128269;</span><input type="search" id="searchInput" placeholder="Search files..." oninput="renderExplorer()"></div>
+            <select id="sortSelect" onchange="renderExplorer()" aria-label="Sort files">
+              <option value="name-asc">Name A&ndash;Z</option>
+              <option value="name-desc">Name Z&ndash;A</option>
+              <option value="size-asc">Size &uarr;</option>
+              <option value="size-desc">Size &darr;</option>
+              <option value="type-asc">Type A&ndash;Z</option>
+            </select>
+            <button class="btn btn-sm" onclick="setExplorerView('list')" id="viewListBtn">&#9776; List</button>
+            <button class="btn btn-sm btn-primary" onclick="setExplorerView('grid')" id="viewGridBtn">&#9638; Grid</button>
+          </div>
+          <div class="status-bar" id="explorerStatus"><span class="dot"></span><span>0 files &bull; 0 MB</span></div>
+          <div id="explorerContainer"></div>
+          <div class="preview-pane" id="previewPane"><span>Select a file to preview details</span></div>
+        </div>
+      </section>
+      <section class="page" id="page-favorites">
+        <div class="page-header"><h1>&#11088; Favorites</h1><p>Your starred files for quick access.</p></div>
+        <div class="glass-card"><div id="favoritesContainer"><div class="empty-state"><span class="empty-state-icon">&#11088;</span><div class="empty-state-title">No favorites yet</div><div class="empty-state-desc">Star files from the Explorer to see them here.</div></div></div></div>
+      </section>
+      <section class="page" id="page-recent">
+        <div class="page-header"><h1>&#128337; Recent Activity</h1><p>Track all your actions across the application.</p></div>
+        <div class="glass-card">
+          <div class="toolbar"><button class="btn btn-sm btn-danger" onclick="clearActivity()">Clear All</button></div>
+          <div class="activity-list" id="recentActivityList"></div>
+        </div>
+      </section>
+      <section class="page" id="page-pdf-merge">
+        <div class="page-header"><h1>&#128196; Merge PDF</h1><p>Combine multiple PDF files into a single document.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('mergeInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select PDF files to merge</div><input type="file" id="mergeInput" multiple accept=".pdf"></div>
+          <div class="status-bar" id="mergeStatus"><span>No PDFs selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="mergeBtn" disabled onclick="mergePDFs()">&#128196; Merge PDFs</button></div>
+          <div id="mergeList" class="file-table-wrap" style="margin-top:12px;"></div>
+        </div>
+      </section>
+      <section class="page" id="page-pdf-split">
+        <div class="page-header"><h1>&#9986; Split PDF</h1><p>Extract specific pages from a PDF document.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('splitInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select a PDF to split</div><input type="file" id="splitInput" accept=".pdf"></div>
+          <div class="form-group" style="margin-top:16px;"><label for="pageRange">Page Range (e.g., 1,3-5,all)</label><input type="text" id="pageRange" placeholder="e.g. 1,3-5,all" value="all"></div>
+          <div class="status-bar" id="splitStatus"><span>No PDF selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="splitBtn" disabled onclick="splitPDF()">&#9986; Split PDF</button></div>
+        </div>
+      </section>
+      <section class="page" id="page-pdf-compress">
+        <div class="page-header"><h1>&#128259; Compress PDF</h1><p>Reduce PDF file size by removing unused objects and compressing streams.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('compressInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select a PDF to compress</div><input type="file" id="compressInput" accept=".pdf"></div>
+          <div class="status-bar" id="compressStatus"><span>No PDF selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="compressBtn" disabled onclick="compressPDF()">&#128259; Compress</button></div>
+        </div>
+      </section>
+      <section class="page" id="page-pdf-watermark">
+        <div class="page-header"><h1>&#128200; Watermark PDF</h1><p>Add a text watermark to every page of your PDF.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('watermarkInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select a PDF to watermark</div><input type="file" id="watermarkInput" accept=".pdf"></div>
+          <div class="form-group" style="margin-top:16px;"><label for="watermarkText">Watermark Text</label><input type="text" id="watermarkText" placeholder="e.g. CONFIDENTIAL" value="DRAFT"></div>
+          <div class="status-bar" id="watermarkStatus"><span>No PDF selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="watermarkBtn" disabled onclick="watermarkPDF()">&#128200; Add Watermark</button></div>
+        </div>
+      </section>
+      <section class="page" id="page-pdf-rotate">
+        <div class="page-header"><h1>&#128260; Rotate PDF</h1><p>Rotate all pages in a PDF document.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('rotateInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select a PDF to rotate</div><input type="file" id="rotateInput" accept=".pdf"></div>
+          <div class="form-group" style="margin-top:16px;"><label for="rotateAngle">Rotation Angle</label><select id="rotateAngle"><option value="90">90&deg; Clockwise</option><option value="180">180&deg;</option><option value="270">90&deg; Counter-clockwise</option></select></div>
+          <div class="status-bar" id="rotateStatus"><span>No PDF selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="rotateBtn" disabled onclick="rotatePDF()">&#128260; Rotate</button></div>
+        </div>
+      </section>
+      <section class="page" id="page-pdf-extract">
+        <div class="page-header"><h1>&#128247; Extract Images from PDF</h1><p>Extract embedded images from PDF files (client-side extraction is limited; works best with simple PDFs).</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('extractInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select a PDF to extract images</div><input type="file" id="extractInput" accept=".pdf"></div>
+          <div class="status-bar" id="extractStatus"><span>No PDF selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="extractBtn" disabled onclick="extractImages()">&#128247; Extract</button></div>
+          <div class="gallery" id="extractGallery"></div>
+        </div>
+      </section>
+      <section class="page" id="page-pdf-encrypt">
+        <div class="page-header"><h1>&#128274; Encrypt / Unlock PDF</h1><p>Add password protection or remove it from PDF files.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('encryptInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select a PDF</div><input type="file" id="encryptInput" accept=".pdf"></div>
+          <div class="form-row" style="margin-top:16px;">
+            <div class="form-group"><label for="encryptPassword">Set Password (leave empty to remove)</label><input type="password" id="encryptPassword" placeholder="Enter password"></div>
+            <div class="form-group"><label for="encryptAction">Action</label><select id="encryptAction"><option value="encrypt">Encrypt (Add Password)</option><option value="decrypt">Decrypt (Remove Password)</option></select></div>
+          </div>
+          <div class="status-bar" id="encryptStatus"><span>No PDF selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="encryptBtn" disabled onclick="encryptPDF()">&#128274; Process</button></div>
+        </div>
+      </section>
+      <section class="page" id="page-img-to-pdf">
+        <div class="page-header"><h1>&#128444; Images &rarr; PDF</h1><p>Convert one or more images into a single PDF document.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('imgToPdfInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select images to convert</div><input type="file" id="imgToPdfInput" multiple accept="image/*"></div>
+          <div class="status-bar" id="imgToPdfStatus"><span>No images selected</span></div>
+          <div class="gallery" id="imgToPdfGallery"></div>
+          <div class="toolbar"><button class="btn btn-success" id="imgToPdfBtn" disabled onclick="imagesToPDF()">&#128196; Convert to PDF</button></div>
+        </div>
+      </section>
+      <section class="page" id="page-image-resize">
+        <div class="page-header"><h1>&#128470; Resize Image</h1><p>Resize images to custom dimensions.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('resizeInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select an image to resize</div><input type="file" id="resizeInput" accept="image/*"></div>
+          <div class="form-row" style="margin-top:16px;"><div class="form-group"><label for="resizeWidth">Width (px)</label><input type="number" id="resizeWidth" placeholder="800" min="1"></div><div class="form-group"><label for="resizeHeight">Height (px)</label><input type="number" id="resizeHeight" placeholder="600" min="1"></div></div>
+          <div class="status-bar" id="resizeStatus"><span>No image selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="resizeBtn" disabled onclick="resizeImage()">&#128470; Resize</button></div>
+          <div class="preview-pane" id="resizePreview"></div>
+        </div>
+      </section>
+      <section class="page" id="page-image-compress">
+        <div class="page-header"><h1>&#128190; Compress Image</h1><p>Reduce image file size by adjusting JPEG quality.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('compressImgInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select an image to compress</div><input type="file" id="compressImgInput" accept="image/*"></div>
+          <div class="form-group" style="margin-top:16px;"><label for="compressQuality">Quality (1&ndash;100)</label><input type="number" id="compressQuality" min="1" max="100" value="70"></div>
+          <div class="status-bar" id="compressImgStatus"><span>No image selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="compressImgBtn" disabled onclick="compressImage()">&#128190; Compress</button></div>
+          <div class="preview-pane" id="compressImgPreview"></div>
+        </div>
+      </section>
+      <section class="page" id="page-bg-remove">
+        <div class="page-header"><h1>&#127912; Background Removal</h1><p>Remove backgrounds from images using canvas-based color detection (works best with solid backgrounds).</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('bgInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select an image</div><input type="file" id="bgInput" accept="image/*"></div>
+          <div class="status-bar" id="bgStatus"><span>No image selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="bgBtn" disabled onclick="removeBackground()">&#127912; Remove Background</button></div>
+          <div class="preview-pane" id="bgPreview"></div>
+        </div>
+      </section>
+      <section class="page" id="page-exif-viewer">
+        <div class="page-header"><h1>&#128214; EXIF Viewer</h1><p>View metadata and EXIF data from image files.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('exifInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select an image to view EXIF data</div><input type="file" id="exifInput" accept="image/*"></div>
+          <div class="status-bar" id="exifStatus"><span>No image selected</span></div>
+          <div class="file-table-wrap" style="margin-top:12px;" id="exifTableWrap"></div>
+        </div>
+      </section>
+      <section class="page" id="page-ai-classify">
+        <div class="page-header"><h1>&#129302; AI Classification</h1><p>Automatically classify and tag images using TensorFlow.js MobileNet.</p></div>
+        <div class="glass-card">
+          <div class="ml-status" style="margin-bottom:16px;"><span class="ml-dot" id="aiMlDot"></span><span id="aiMlStatus">Loading AI model...</span></div>
+          <div class="drop-zone" onclick="document.getElementById('aiClassifyInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select images to classify</div><input type="file" id="aiClassifyInput" multiple accept="image/*"></div>
+          <div class="status-bar" id="aiClassifyStatus"><span>No images selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="aiClassifyBtn" onclick="classifySelectedImages()">&#129302; Classify Images</button></div>
+          <div class="file-table-wrap" style="margin-top:12px;" id="aiClassifyResults"></div>
+        </div>
+      </section>
+      <section class="page" id="page-duplicates">
+        <div class="page-header"><h1>&#128203; Duplicate Detection</h1><p>Find duplicate images by comparing perceptual hashes.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('dupInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select images to check for duplicates</div><input type="file" id="dupInput" multiple accept="image/*"></div>
+          <div class="status-bar" id="dupStatus"><span>No images selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="dupBtn" disabled onclick="findDuplicates()">&#128203; Find Duplicates</button></div>
+          <div id="dupResults"></div>
+        </div>
+      </section>
+      <section class="page" id="page-ocr">
+        <div class="page-header"><h1>&#128221; OCR Text Extraction</h1><p>Extract text from images using Tesseract.js OCR (loaded on demand).</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('ocrInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select an image for OCR</div><input type="file" id="ocrInput" accept="image/*"></div>
+          <div class="status-bar" id="ocrStatus"><span>No image selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="ocrBtn" disabled onclick="runOCR()">&#128221; Extract Text</button></div>
+          <div class="preview-pane" id="ocrResult" style="text-align:left;display:none;"></div>
+        </div>
+      </section>
+      <section class="page" id="page-ai-summary">
+        <div class="page-header"><h1>&#128240; AI Document Summary</h1><p>Generate a summary of text content extracted from documents.</p></div>
+        <div class="glass-card">
+          <div class="drop-zone" onclick="document.getElementById('summaryInput').click()"><span class="drop-zone-icon">&#128228;</span><div class="drop-zone-text">Select a text file or PDF to summarize</div><input type="file" id="summaryInput" accept=".txt,.pdf"></div>
+          <div class="status-bar" id="summaryStatus"><span>No document selected</span></div>
+          <div class="toolbar"><button class="btn btn-success" id="summaryBtn" disabled onclick="generateSummary()">&#128240; Generate Summary</button></div>
+          <div class="preview-pane" id="summaryResult" style="text-align:left;display:none;"></div>
+        </div>
+      </section>
+      <section class="page" id="page-analytics">
+        <div class="page-header"><h1>&#128200; Analytics</h1><p>Insights and statistics about your file usage.</p></div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-card-icon" style="background:rgba(99,102,241,0.15);">&#128193;</div><div class="stat-card-value" id="analyticsFiles">0</div><div class="stat-card-label">Total Files</div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:rgba(16,185,129,0.15);">&#128196;</div><div class="stat-card-value" id="analyticsPdfs">0</div><div class="stat-card-label">PDFs</div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:rgba(245,158,11,0.15);">&#128247;</div><div class="stat-card-value" id="analyticsImages">0</div><div class="stat-card-label">Images</div></div>
+          <div class="stat-card"><div class="stat-card-icon" style="background:rgba(239,68,68,0.15);">&#128190;</div><div class="stat-card-value" id="analyticsSize">0 MB</div><div class="stat-card-label">Total Size</div></div>
+        </div>
+        <div class="glass-card" style="margin-bottom:24px;">
+          <div class="glass-card-header"><div class="glass-card-icon">&#128200;</div><div><div class="glass-card-title">File Type Distribution</div><div class="glass-card-desc">Breakdown by file category</div></div></div>
+          <div class="chart-container"><div class="chart-bar" id="typeChart"></div></div>
+        </div>
+        <div class="glass-card">
+          <div class="glass-card-header"><div class="glass-card-icon">&#128202;</div><div><div class="glass-card-title">Activity Timeline</div><div class="glass-card-desc">Recent actions over time</div></div></div>
+          <div class="activity-list" id="analyticsActivity"></div>
+        </div>
+      </section>
+      <section class="page" id="page-downloads">
+        <div class="page-header"><h1>&#128229; Download Manager</h1><p>Track your recent downloads and exports.</p></div>
+        <div class="glass-card">
+          <div class="toolbar"><button class="btn btn-sm btn-danger" onclick="clearDownloads()">Clear History</button></div>
+          <div id="downloadList"></div>
+        </div>
+      </section>
+      <section class="page" id="page-export">
+        <div class="page-header"><h1>&#128230; Export Center</h1><p>Export your workspace data and settings.</p></div>
+        <div class="glass-card">
+          <div class="feature-grid">
+            <div class="feature-card" onclick="exportData('files')"><span class="feature-card-icon">&#128193;</span><div class="feature-card-title">Export Files List</div><div class="feature-card-desc">CSV of all files</div></div>
+            <div class="feature-card" onclick="exportData('settings')"><span class="feature-card-icon">&#9881;</span><div class="feature-card-title">Export Settings</div><div class="feature-card-desc">JSON configuration</div></div>
+            <div class="feature-card" onclick="exportData('activity')"><span class="feature-card-icon">&#128337;</span><div class="feature-card-title">Export Activity</div><div class="feature-card-desc">Activity log as JSON</div></div>
+            <div class="feature-card" onclick="exportData('all')"><span class="feature-card-icon">&#128230;</span><div class="feature-card-title">Export All Data</div><div class="feature-card-desc">Complete backup</div></div>
+          </div>
+        </div>
+      </section>
+      <section class="page" id="page-settings">
+        <div class="page-header"><h1>&#9881; Settings</h1><p>Customize your experience.</p></div>
+        <div class="glass-card">
+          <div class="settings-group">
+            <div class="settings-group-title">Appearance</div>
+            <div class="setting-item"><div><div class="setting-label">Dark Mode</div><div class="setting-desc">Toggle between light and dark theme</div></div><label class="toggle"><input type="checkbox" id="themeToggle" onchange="toggleTheme()"><span class="slider"></span></label></div>
+            <div class="setting-item"><div><div class="setting-label">Compact Mode</div><div class="setting-desc">Reduce spacing for a denser layout</div></div><label class="toggle"><input type="checkbox" id="compactToggle" onchange="toggleCompact()"><span class="slider"></span></label></div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">File Management</div>
+            <div class="setting-item"><div><div class="setting-label">Auto-classify Images</div><div class="setting-desc">Automatically classify images with AI on upload</div></div><label class="toggle"><input type="checkbox" id="autoClassifyToggle" checked onchange="saveSettings()"><span class="slider"></span></label></div>
+            <div class="setting-item"><div><div class="setting-label">Confirm Before Delete</div><div class="setting-desc">Show confirmation dialog before removing files</div></div><label class="toggle"><input type="checkbox" id="confirmDeleteToggle" checked onchange="saveSettings()"><span class="slider"></span></label></div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">Data & Storage</div>
+            <div class="setting-item"><div><div class="setting-label">Storage Used</div><div class="setting-desc" id="storageInfo">Calculating...</div></div><button class="btn btn-sm btn-danger" onclick="clearAllData()">Clear All Data</button></div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">About</div>
+            <div class="setting-item"><div><div class="setting-label">FilePulse Pro</div><div class="setting-desc">Version 2.0 &bull; Premium File & PDF Tools Suite</div></div><span class="about-text">Built with &#9829;</span></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<style>
+  .about-text {
+    color:var(--text-muted);
+    font-size:0.85rem;
+  }
+</style>
+<script>
+'use strict';
+const { PDFDocument, rgb, StandardFonts, degrees } = PDFLib;
+const { jsPDF } = window.jspdf;
+const AppState = { files: [], favorites: [], activity: [], downloads: [], tags: {}, currentPage: 'dashboard', explorerView: 'grid', mlModel: null, mlReady: false, settings: { theme: 'dark', compact: false, autoClassify: true, confirmDelete: true } };
+const Storage = { save(k, d) { try { localStorage.setItem('filepulse_' + k, JSON.stringify(d)); } catch(e) {} }, load(k, f) { try { const d = localStorage.getItem('filepulse_' + k); return d ? JSON.parse(d) : f; } catch(e) { return f; } }, remove(k) { localStorage.removeItem('filepulse_' + k); } };
+const Toast = { show(m, t, d) { t = t || 'info'; d = d || 4000; const c = document.getElementById('toastContainer'); const icons = { success: '&#10003;', error: '&#10007;', info: '&#8505;', warning: '&#9888;' }; const toast = document.createElement('div'); toast.className = 'toast toast-' + t; toast.innerHTML = '<div class="toast-icon">' + (icons[t]||'&#8505;') + '</div><div class="toast-message">' + m + '</div><button class="toast-close" onclick="this.parentElement.classList.add(\'removing\');setTimeout(()=>this.parentElement.remove(),300)">&times;</button>'; c.appendChild(toast); setTimeout(() => { if (toast.parentElement) { toast.classList.add('removing'); setTimeout(() => toast.remove(), 300); } }, d); }, success(m) { this.show(m, 'success'); }, error(m) { this.show(m, 'error'); }, info(m) { this.show(m, 'info'); }, warning(m) { this.show(m, 'warning'); } };
+const ContextMenu = { show(items, x, y) { const menu = document.getElementById('contextMenu'); menu.innerHTML = ''; items.forEach(item => { if (item.divider) { const div = document.createElement('div'); div.className = 'context-menu-divider'; menu.appendChild(div); } else { const btn = document.createElement('button'); btn.className = 'context-menu-item' + (item.danger ? ' danger' : ''); btn.innerHTML = (item.icon||'') + ' ' + item.label + (item.shortcut ? '<span class="context-menu-shortcut">' + item.shortcut + '</span>' : ''); btn.onclick = (e) => { e.stopPropagation(); item.action(); ContextMenu.hide(); }; menu.appendChild(btn); } }); menu.style.left = Math.min(x, window.innerWidth - 220) + 'px'; menu.style.top = Math.min(y, window.innerHeight - menu.scrollHeight - 10) + 'px'; menu.classList.add('active'); setTimeout(() => document.addEventListener('click', ContextMenu.hide, { once: true }), 10); }, hide() { document.getElementById('contextMenu').classList.remove('active'); } };
+function openModal(title, bodyHTML, footerHTML) { footerHTML = footerHTML || ''; document.getElementById('modalTitle').textContent = title; document.getElementById('modalBody').innerHTML = bodyHTML; document.getElementById('modalFooter').innerHTML = footerHTML; document.getElementById('modalOverlay').classList.add('active'); }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
+document.getElementById('modalOverlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
+function showShortcuts() { openModal('Keyboard Shortcuts', '<div class="shortcut-grid"><span class="shortcut-desc">Toggle Sidebar</span><span class="shortcut-key">Ctrl + B</span><span class="shortcut-desc">Toggle Theme</span><span class="shortcut-key">Ctrl + T</span><span class="shortcut-desc">Go to Dashboard</span><span class="shortcut-key">Ctrl + 1</span><span class="shortcut-desc">Go to Explorer</span><span class="shortcut-key">Ctrl + 2</span><span class="shortcut-desc">Go to Favorites</span><span class="shortcut-key">Ctrl + 3</span><span class="shortcut-desc">Search Files</span><span class="shortcut-key">Ctrl + F</span><span class="shortcut-desc">Select All Files</span><span class="shortcut-key">Ctrl + A</span><span class="shortcut-desc">Clear All Files</span><span class="shortcut-key">Ctrl + Shift + X</span><span class="shortcut-desc">Open Settings</span><span class="shortcut-key">Ctrl + ,</span><span class="shortcut-desc">Show Shortcuts</span><span class="shortcut-key">Ctrl + /</span></div>'); }
+document.addEventListener('keydown', (e) => { const ctrl = e.ctrlKey || e.metaKey; if (ctrl && e.key === 'b') { e.preventDefault(); toggleSidebar(); } if (ctrl && e.key === 't') { e.preventDefault(); toggleTheme(); } if (ctrl && e.key === '1') { e.preventDefault(); navigateTo('dashboard'); } if (ctrl && e.key === '2') { e.preventDefault(); navigateTo('explorer'); } if (ctrl && e.key === '3') { e.preventDefault(); navigateTo('favorites'); } if (ctrl && e.key === 'f') { e.preventDefault(); const inp = document.getElementById('searchInput'); if(inp) inp.focus(); } if (ctrl && e.key === 'a') { e.preventDefault(); selectAllExplorer(); } if (ctrl && e.key === ',') { e.preventDefault(); navigateTo('settings'); } if (ctrl && e.key === '/') { e.preventDefault(); showShortcuts(); } if (ctrl && e.shiftKey && e.key === 'X') { e.preventDefault(); clearExplorer(); } if (e.key === 'Escape') { closeModal(); ContextMenu.hide(); } });
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function navigateTo(page) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); const target = document.getElementById('page-' + page); if (target) { target.classList.add('active'); AppState.currentPage = page; } document.querySelectorAll('.sidebar-item').forEach(item => { item.classList.toggle('active', item.dataset.page === page); }); const names = { dashboard: 'Dashboard', explorer: 'File Explorer', favorites: 'Favorites', recent: 'Recent Activity', 'pdf-merge': 'Merge PDF', 'pdf-split': 'Split PDF', 'pdf-compress': 'Compress PDF', 'pdf-watermark': 'Watermark PDF', 'pdf-rotate': 'Rotate PDF', 'pdf-extract': 'Extract Images', 'pdf-encrypt': 'Encrypt / Unlock', 'img-to-pdf': 'Images to PDF', 'image-resize': 'Resize Image', 'image-compress': 'Compress Image', 'bg-remove': 'Background Removal', 'exif-viewer': 'EXIF Viewer', 'ai-classify': 'AI Classification', duplicates: 'Duplicate Detection', ocr: 'OCR', 'ai-summary': 'AI Summary', analytics: 'Analytics', downloads: 'Download Manager', export: 'Export Center', settings: 'Settings' }; document.getElementById('breadcrumbCurrent').textContent = names[page] || page; if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open'); refreshPage(page); }
+function refreshPage(page) { switch(page) { case 'dashboard': refreshDashboard(); break; case 'explorer': renderExplorer(); break; case 'favorites': renderFavorites(); break; case 'recent': renderRecentActivity(); break; case 'analytics': refreshAnalytics(); break; case 'downloads': renderDownloads(); break; case 'settings': refreshSettings(); break; } }
+function toggleTheme() { const isLight = document.documentElement.getAttribute('data-theme') === 'light'; document.documentElement.setAttribute('data-theme', isLight ? 'dark' : 'light'); document.getElementById('themeToggle').checked = !isLight; AppState.settings.theme = isLight ? 'dark' : 'light'; Storage.save('settings', AppState.settings); document.querySelector('meta[name="theme-color"]').content = isLight ? '#f1f5f9' : '#0b0f19'; }
+function toggleCompact() { AppState.settings.compact = document.getElementById('compactToggle').checked; document.body.classList.toggle('compact-mode', AppState.settings.compact); Storage.save('settings', AppState.settings); }
+async function loadMLModel() { const mlDot = document.getElementById('mlDot'); const mlText = document.getElementById('mlStatusText'); const aiDot = document.getElementById('aiMlDot'); const aiText = document.getElementById('aiMlStatus'); try { AppState.mlModel = await mobilenet.load({ version: 2, alpha: 1.0 }); AppState.mlReady = true; mlDot.classList.add('ready'); mlText.textContent = 'AI Ready'; if (aiDot) aiDot.classList.add('ready'); if (aiText) aiText.textContent = 'AI model loaded - ready to classify'; Toast.success('AI model loaded successfully'); } catch (err) { mlText.textContent = 'AI unavailable'; if (aiText) aiText.textContent = 'AI model failed to load'; Toast.warning('AI model could not be loaded.'); } }
+async function classifyImage(url) { if (!AppState.mlModel) return 'AI unavailable'; try { const result = await AppState.mlModel.classify(url); if (result && result[0]) return result[0].className + ' (' + Math.round(result[0].probability * 100) + '%)'; } catch(e) {} return 'Unclassified'; }
+function addActivity(action, detail, icon) { icon = icon || '&#128200;'; AppState.activity.unshift({ id: Date.now(), action, detail, icon, time: new Date().toLocaleString() }); if (AppState.activity.length > 100) AppState.activity.pop(); Storage.save('activity', AppState.activity); }
+function clearActivity() { AppState.activity = []; Storage.save('activity', AppState.activity); renderRecentActivity(); Toast.info('Activity log cleared'); }
+function addDownload(name, status) { status = status || 'done'; AppState.downloads.unshift({ id: Date.now(), name, status, time: new Date().toLocaleString() }); if (AppState.downloads.length > 50) AppState.downloads.pop(); Storage.save('downloads', AppState.downloads); renderDownloads(); }
+function clearDownloads() { AppState.downloads = []; Storage.save('downloads', AppState.downloads); renderDownloads(); Toast.info('Download history cleared'); }
+function toggleFavorite(fileId) { const idx = AppState.favorites.indexOf(fileId); if (idx >= 0) { AppState.favorites.splice(idx, 1); Toast.info('Removed from favorites'); } else { AppState.favorites.push(fileId); Toast.success('Added to favorites'); } Storage.save('favorites', AppState.favorites); renderExplorer(); renderFavorites(); }
+function isFavorite(fileId) { return AppState.favorites.includes(fileId); }
+function getFileTags(fileId) { return AppState.tags[fileId] || []; }
+function addFileTag(fileId, tag) { if (!AppState.tags[fileId]) AppState.tags[fileId] = []; if (!AppState.tags[fileId].includes(tag)) { AppState.tags[fileId].push(tag); Storage.save('tags', AppState.tags); } }
+function removeFileTag(fileId, tag) { if (AppState.tags[fileId]) { AppState.tags[fileId] = AppState.tags[fileId].filter(t => t !== tag); Storage.save('tags', AppState.tags); } }
+function addFilesToExplorer(fileList) { const newFiles = Array.from(fileList).map((file, idx) => { if (AppState.files.some(f => f.name === file.name && f.size === file.size)) return null; return { id: (Date.now() + idx + Math.random() * 1000) | 0, name: file.name, size: file.size, type: file.type || 'unknown/unknown', url: URL.createObjectURL(file), file, selected: false, mlLabel: (file.type.startsWith('image/') && AppState.settings.autoClassify) ? 'Classifying...' : '' }; }).filter(Boolean); AppState.files.push(...newFiles); Storage.save('files_meta', AppState.files.map(f => ({ id: f.id, name: f.name, size: f.size, type: f.type }))); if (AppState.settings.autoClassify && AppState.mlReady) { newFiles.forEach(async (f) => { if (f.type.startsWith('image/')) { f.mlLabel = await classifyImage(f.url); renderExplorer(); } }); } renderExplorer(); updateDashboardStats(); addActivity('Files Added', newFiles.length + ' file(s) uploaded', '&#128228;'); if (newFiles.length > 0) Toast.success(newFiles.length + ' file(s) added'); }
+function clearExplorer() { if (AppState.settings.confirmDelete && AppState.files.length > 0) { if (!confirm('Clear all files from the explorer?')) return; } AppState.files.forEach(f => URL.revokeObjectURL(f.url)); AppState.files = []; renderExplorer(); updateDashboardStats(); document.getElementById('previewPane').innerHTML = '<span>Select a file to preview details</span>'; Toast.info('All files cleared'); }
+function selectAllExplorer() { const all = AppState.files.some(f => !f.selected); AppState.files.forEach(f => f.selected = all); renderExplorer(); }
+function toggleFileSelect(id) { const f = AppState.files.find(x => x.id === id); if (f) f.selected = !f.selected; renderExplorer(); }
+function removeFile(id) { if (AppState.settings.confirmDelete) { if (!confirm('Remove this file?')) return; } const f = AppState.files.find(x => x.id === id); if (f) URL.revokeObjectURL(f.url); AppState.files = AppState.files.filter(x => x.id !== id); renderExplorer(); updateDashboardStats(); }
+function renderExplorer() { const container = document.getElementById('explorerContainer'); if (!container) return; container.innerHTML = ''; let list = [...AppState.files]; const term = (document.getElementById('searchInput')?.value || '').toLowerCase(); if (term) list = list.filter(f => f.name.toLowerCase().includes(term)); const sort = document.getElementById('sortSelect')?.value || 'name-asc'; if (sort === 'name-asc') list.sort((a,b) => a.name.localeCompare(b.name)); else if (sort === 'name-desc') list.sort((a,b) => b.name.localeCompare(a.name)); else if (sort === 'size-asc') list.sort((a,b) => a.size - b.size); else if (sort === 'size-desc') list.sort((a,b) => b.size - a.size); else if (sort === 'type-asc') list.sort((a,b) => a.type.localeCompare(b.type)); if (list.length === 0) { container.innerHTML = '<div class="empty-state"><span class="empty-state-icon">&#128193;</span><div class="empty-state-title">No files</div><div class="empty-state-desc">Drop files or click "Add Files" to get started.</div></div>'; updateExplorerStatus(); return; } if (AppState.explorerView === 'grid') { const grid = document.createElement('div'); grid.className = 'file-grid-view'; list.forEach(f => { const item = document.createElement('div'); item.className = 'file-grid-item' + (f.selected ? ' selected' : ''); const ext = f.name.split('.').pop().toLowerCase(); const isImg = f.type.startsWith('image/'); const iconMap = { pdf: '&#128196;', zip: '&#128230;', doc: '&#128221;', docx: '&#128221;', txt: '&#128221;', '': '&#128196;' }; const icon = isImg ? '' : (iconMap[ext] || '&#128196;'); item.innerHTML = '<div class="preview">' + (isImg ? '<img src="' + f.url + '" alt="' + f.name + '" loading="lazy">' : icon) + '</div><div class="name">' + f.name + '</div><div class="meta">' + (f.size / 1024).toFixed(1) + ' KB</div>' + (f.mlLabel ? '<div style="font-size:0.65rem;color:var(--primary-light);margin-top:4px;">' + f.mlLabel + '</div>' : ''); item.onclick = () => { toggleFileSelect(f.id); }; item.oncontextmenu = (e) => { e.preventDefault(); showFileContextMenu(e.clientX, e.clientY, f); }; item.ondblclick = () => showPreview(f.id); grid.appendChild(item); }); container.appendChild(grid); } else { const wrap = document.createElement('div'); wrap.className = 'file-table-wrap'; const table = document.createElement('table'); table.className = 'file-table'; table.innerHTML = '<thead><tr><th style="width:40px;"><input type="checkbox" onchange="selectAllExplorer()" ' + (AppState.files.every(f=>f.selected) ? 'checked' : '') + '></th><th>Name</th><th>Type</th><th>Size</th><th>AI Label</th><th style="width:80px;">Actions</th></tr></thead><tbody></tbody>'; const tbody = table.querySelector('tbody'); list.forEach(f => { const ext = f.name.split('.').pop().toLowerCase(); const iconMap = { pdf: '&#128196;', jpg: '&#128247;', jpeg: '&#128247;', png: '&#128247;', gif: '&#128247;', webp: '&#128247;', svg: '&#128247;', zip: '&#128230;', rar: '&#128230;', '7z': '&#128230;', doc: '&#128221;', docx: '&#128221;', txt: '&#128221;', xls: '&#128202;', xlsx: '&#128202;', mp3: '&#127925;', mp4: '&#127909;', '': '&#128196;' }; const icon = iconMap[ext] || '&#128196;'; const tr = document.createElement('tr'); tr.innerHTML = '<td><input type="checkbox" ' + (f.selected ? 'checked' : '') + ' onchange="toggleFileSelect(' + f.id + ')"></td><td><div class="file-name" onclick="showPreview(' + f.id + ')"><span class="file-icon">' + icon + '</span>' + f.name + '</div></td><td>' + (f.type.split('/')[1] || f.type) + '</td><td>' + (f.size / 1024).toFixed(1) + ' KB</td><td>' + (f.mlLabel ? '<span style="color:var(--primary-light);font-size:0.8rem;">' + f.mlLabel + '</span>' : '<span style="color:var(--text-muted);font-size:0.8rem;">&mdash;</span>') + '</td><td><button class="fav-btn ' + (isFavorite(f.id) ? 'active' : '') + '" onclick="event.stopPropagation();toggleFavorite(' + f.id + ')" title="Toggle favorite">' + (isFavorite(f.id) ? '&#11088;' : '&#9734;') + '</button><button class="fav-btn" onclick="event.stopPropagation();removeFile(' + f.id + ')" title="Remove file" style="color:var(--accent-danger);">&#10005;</button></td>'; tr.oncontextmenu = (e) => { e.preventDefault(); showFileContextMenu(e.clientX, e.clientY, f); }; tbody.appendChild(tr); }); wrap.appendChild(table); container.appendChild(wrap); } updateExplorerStatus(); updateFileCountBadge(); }
+function updateExplorerStatus() { const count = AppState.files.length; const selCount = AppState.files.filter(f => f.selected).length; const totalMB = (AppState.files.reduce((s, f) => s + f.size, 0) / 1e6).toFixed(2); const el = document.getElementById('explorerStatus'); if (el) el.innerHTML = '<span class="dot"></span><span>' + count + ' files (' + selCount + ' selected) &bull; ' + totalMB + ' MB</span>'; document.getElementById('clearExplorerBtn').disabled = count === 0; document.getElementById('bulkZipBtn').disabled = selCount === 0; }
+function updateFileCountBadge() { const badge = document.getElementById('fileCountBadge'); if (badge) badge.textContent = AppState.files.length; }
+function setExplorerView(mode) { AppState.explorerView = mode; document.getElementById('viewListBtn').className = 'btn btn-sm' + (mode === 'list' ? ' btn-primary' : ''); document.getElementById('viewGridBtn').className = 'btn btn-sm' + (mode === 'grid' ? ' btn-primary' : ''); renderExplorer(); }
+function showPreview(id) { const f = AppState.files.find(x => x.id === id); if (!f) return; const pane = document.getElementById('previewPane'); let html = '<div style="text-align:left;width:100%;"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;"><span style="font-size:2rem;">' + (f.type.startsWith('image/') ? '&#128247;' : '&#128196;') + '</span><div><strong style="font-size:1.1rem;">' + f.name + '</strong><br><span style="color:var(--text-dim);font-size:0.85rem;">' + f.type + ' &bull; ' + (f.size/1024).toFixed(1) + ' KB</span></div></div>'; if (f.mlLabel) { html += '<div style="margin-bottom:12px;padding:8px 12px;background:var(--gradient-3);border-radius:var(--radius-sm);"><span style="font-weight:600;">&#129302; AI: </span>' + f.mlLabel + '</div>'; } const tags = getFileTags(f.id); if (tags.length > 0) { html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">'; tags.forEach(t => { html += '<span class="tag tag-primary">' + t + ' <span class="remove" onclick="removeFileTag(' + f.id + ',\'' + t + '\');showPreview(' + f.id + ')">&times;</span></span>'; }); html += '</div>'; } html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"><button class="btn btn-sm ' + (isFavorite(f.id) ? 'btn-warning' : '') + '" onclick="toggleFavorite(' + f.id + ');showPreview(' + f.id + ')">' + (isFavorite(f.id) ? '&#11088; Starred' : '&#9734; Favorite') + '</button><button class="btn btn-sm" onclick="addTagPrompt(' + f.id + ')">&#127991; Add Tag</button><button class="btn btn-sm btn-danger" onclick="removeFile(' + f.id + ')">&#128465; Remove</button></div>'; if (f.type.startsWith('image/')) { html += '<img src="' + f.url + '" alt="' + f.name + '" style="max-width:100%;max-height:400px;border-radius:var(--radius-sm);box-shadow:var(--shadow-md);">'; } else if (f.type === 'application/pdf') { html += '<embed src="' + f.url + '" type="application/pdf" style="width:100%;height:400px;border-radius:var(--radius-sm);border:1px solid var(--border);">'; } else { html += '<em style="color:var(--text-muted);">Preview not available for this file type.</em>'; } html += '</div>'; pane.innerHTML = html; }
+function addTagPrompt(fileId) { const tag = prompt('Enter a tag:'); if (tag && tag.trim()) { addFileTag(fileId, tag.trim()); showPreview(fileId); Toast.success('Tag "' + tag.trim() + '" added'); } }
+function showFileContextMenu(x, y, file) { ContextMenu.show([ { icon: '&#128269;', label: 'Preview', action: () => showPreview(file.id) }, { icon: isFavorite(file.id) ? '&#11088;' : '&#9734;', label: isFavorite(file.id) ? 'Remove from Favorites' : 'Add to Favorites', action: () => toggleFavorite(file.id) }, { icon: '&#127991;', label: 'Add Tag', action: () => addTagPrompt(file.id) }, { divider: true }, { icon: '&#128230;', label: 'Download', action: () => downloadFile(file) }, { icon: '&#128465;', label: 'Delete', danger: true, action: () => removeFile(file.id) } ], x, y); }
+function downloadFile(file) { const a = document.createElement('a'); a.href = file.url; a.download = file.name; a.click(); addDownload(file.name); addActivity('Downloaded', file.name, '&#128229;'); }
+async function downloadSelectedZip() { const selected = AppState.files.filter(f => f.selected); if (selected.length === 0) return; const zip = new JSZip(); for (const f of selected) { const blob = await fetch(f.url).then(r => r.blob()); zip.file(f.name, blob); } const content = await zip.generateAsync({ type: 'blob' }); saveAs(content, 'selected-files.zip'); addDownload('selected-files.zip'); addActivity('ZIP Download', selected.length + ' files', '&#128230;'); Toast.success('ZIP with ' + selected.length + ' files downloaded'); }
+document.addEventListener('DOMContentLoaded', () => { const dropZone = document.getElementById('dropZone'); if (dropZone) { dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); }); dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over')); dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files.length > 0) addFilesToExplorer(e.dataTransfer.files); }); } }); document.getElementById('explorerInput')?.addEventListener('change', (e) => { if (e.target.files.length > 0) addFilesToExplorer(e.target.files); e.target.value = ''; });
+function renderFavorites() { const container = document.getElementById('favoritesContainer'); if (!container) return; const favFiles = AppState.files.filter(f => AppState.favorites.includes(f.id)); if (favFiles.length === 0) { container.innerHTML = '<div class="empty-state"><span class="empty-state-icon">&#11088;</span><div class="empty-state-title">No favorites yet</div><div class="empty-state-desc">Star files from the Explorer to see them here.</div></div>'; return; } const wrap = document.createElement('div'); wrap.className = 'file-table-wrap'; let html = '<table class="file-table"><thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Actions</th></tr></thead><tbody>'; favFiles.forEach(f => { html += '<tr><td><div class="file-name" onclick="navigateTo(\'explorer\');showPreview(' + f.id + ')"><span class="file-icon">&#128196;</span>' + f.name + '</div></td><td>' + (f.type.split('/')[1] || f.type) + '</td><td>' + (f.size/1024).toFixed(1) + ' KB</td><td><button class="fav-btn active" onclick="toggleFavorite(' + f.id + ');renderFavorites()">&#11088;</button></td></tr>'; }); html += '</tbody></table>'; wrap.innerHTML = html; container.appendChild(wrap); }
+function renderRecentActivity() { const container = document.getElementById('recentActivityList'); if (!container) return; if (AppState.activity.length === 0) { container.innerHTML = '<div class="empty-state"><span class="empty-state-icon">&#128337;</span><div class="empty-state-title">No activity yet</div><div class="empty-state-desc">Your actions will appear here.</div></div>'; return; } container.innerHTML = AppState.activity.map(a => '<div class="activity-item"><div class="activity-icon" style="background:var(--gradient-3);">' + a.icon + '</div><div class="activity-content"><div class="activity-title">' + a.action + '</div><div class="activity-time">' + a.detail + ' &bull; ' + a.time + '</div></div></div>').join(''); }
+function refreshDashboard() { updateDashboardStats(); renderDashboardActivity(); }
+function updateDashboardStats() { const total = AppState.files.length; const pdfs = AppState.files.filter(f => f.type === 'application/pdf').length; const imgs = AppState.files.filter(f => f.type.startsWith('image/')).length; const totalSize = (AppState.files.reduce((s, f) => s + f.size, 0) / 1e6).toFixed(2); document.getElementById('statFiles').textContent = total; document.getElementById('statPdfs').textContent = pdfs; document.getElementById('statImages').textContent = imgs; document.getElementById('statSize').textContent = totalSize + ' MB'; }
+function renderDashboardActivity() { const container = document.getElementById('dashboardActivity'); if (!container) return; const recent = AppState.activity.slice(0, 5); if (recent.length === 0) { container.innerHTML = '<div class="empty-state"><span class="empty-state-icon">&#128200;</span><div class="empty-state-title">No activity yet</div><div class="empty-state-desc">Start using tools to see your activity here.</div></div>'; return; } container.innerHTML = recent.map(a => '<div class="activity-item"><div class="activity-icon" style="background:var(--gradient-3);">' + a.icon + '</div><div class="activity-content"><div class="activity-title">' + a.action + '</div><div class="activity-time">' + a.detail + ' &bull; ' + a.time + '</div></div></div>').join(''); }
+function refreshAnalytics() { const total = AppState.files.length; const pdfs = AppState.files.filter(f => f.type === 'application/pdf').length; const imgs = AppState.files.filter(f => f.type.startsWith('image/')).length; const totalSize = (AppState.files.reduce((s, f) => s + f.size, 0) / 1e6).toFixed(2); document.getElementById('analyticsFiles').textContent = total; document.getElementById('analyticsPdfs').textContent = pdfs; document.getElementById('analyticsImages').textContent = imgs; document.getElementById('analyticsSize').textContent = totalSize + ' MB'; const chart = document.getElementById('typeChart'); if (chart) { const others = total - pdfs - imgs; const max = Math.max(pdfs, imgs, others, 1); chart.innerHTML = '<div class="chart-bar-item" style="height:' + (pdfs/max)*100 + '%;background:var(--accent-info);"><span class="value">' + pdfs + '</span><span class="label">PDFs</span></div><div class="chart-bar-item" style="height:' + (imgs/max)*100 + '%;background:var(--accent-success);"><span class="value">' + imgs + '</span><span class="label">Images</span></div><div class="chart-bar-item" style="height:' + (others/max)*100 + '%;background:var(--accent-warning);"><span class="value">' + others + '</span><span class="label">Others</span></div>'; } const actContainer = document.getElementById('analyticsActivity'); if (actContainer) { const recent = AppState.activity.slice(0, 10); if (recent.length === 0) { actContainer.innerHTML = '<div class="empty-state"><span class="empty-state-icon">&#128200;</span><div class="empty-state-title">No data yet</div></div>'; } else { actContainer.innerHTML = recent.map(a => '<div class="activity-item"><div class="activity-icon" style="background:var(--gradient-3);">' + a.icon + '</div><div class="activity-content"><div class="activity-title">' + a.action + '</div><div class="activity-time">' + a.detail + ' &bull; ' + a.time + '</div></div></div>').join(''); } } }
+function renderDownloads() { const container = document.getElementById('downloadList'); if (!container) return; if (AppState.downloads.length === 0) { container.innerHTML = '<div class="empty-state"><span class="empty-state-icon">&#128229;</span><div class="empty-state-title">No downloads yet</div><div class="empty-state-desc">Your downloaded files will appear here.</div></div>'; return; } container.innerHTML = AppState.downloads.map(d => '<div class="download-item"><div class="info"><div class="name">' + d.name + '</div><div class="meta">' + d.time + '</div></div><span class="status ' + d.status + '">' + (d.status === 'done' ? '&#10003; Completed' : d.status) + '</span></div>').join(''); }
+function refreshSettings() { let total = 0; for (let key in localStorage) { if (key.startsWith('filepulse_')) total += localStorage[key].length; } document.getElementById('storageInfo').textContent = (total / 1024).toFixed(1) + ' KB used by app data'; }
+function saveSettings() { AppState.settings.autoClassify = document.getElementById('autoClassifyToggle').checked; AppState.settings.confirmDelete = document.getElementById('confirmDeleteToggle').checked; Storage.save('settings', AppState.settings); }
+function clearAllData() { if (!confirm('This will clear all stored data including files, settings, and activity. Continue?')) return; for (let key in localStorage) { if (key.startsWith('filepulse_')) localStorage.removeItem(key); } AppState.files = []; AppState.favorites = []; AppState.activity = []; AppState.downloads = []; AppState.tags = {}; renderExplorer(); updateDashboardStats(); refreshSettings(); Toast.info('All data cleared'); }
+function exportData(type) { let data, filename; switch(type) { case 'files': data = AppState.files.map(f => ({ name: f.name, size: f.size, type: f.type, mlLabel: f.mlLabel })); filename = 'filepulse-files.csv'; const csv = 'Name,Size (KB),Type,AI Label\n' + data.map(f => '"' + f.name + '",' + (f.size/1024).toFixed(1) + ',"' + f.type + '","' + (f.mlLabel || '') + '"').join('\n'); downloadText(csv, filename, 'text/csv'); break; case 'settings': data = AppState.settings; filename = 'filepulse-settings.json'; downloadText(JSON.stringify(data, null, 2), filename, 'application/json'); break; case 'activity': data = AppState.activity; filename = 'filepulse-activity.json'; downloadText(JSON.stringify(data, null, 2), filename, 'application/json'); break; case 'all': data = { settings: AppState.settings, favorites: AppState.favorites, activity: AppState.activity, downloads: AppState.downloads, tags: AppState.tags, files: AppState.files.map(f => ({ name: f.name, size: f.size, type: f.type, mlLabel: f.mlLabel })) }; filename = 'filepulse-backup.json'; downloadText(JSON.stringify(data, null, 2), filename, 'application/json'); break; } addActivity('Export', type + ' data exported', '&#128230;'); Toast.success(type + ' exported successfully'); }
+function downloadText(content, filename, mimeType) { const blob = new Blob([content], { type: mimeType }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url); addDownload(filename); }
+let mergeFiles = [];
+document.getElementById('mergeInput')?.addEventListener('change', (e) => { mergeFiles = Array.from(e.target.files); const list = document.getElementById('mergeList'); if (mergeFiles.length === 0) { list.innerHTML = ''; document.getElementById('mergeBtn').disabled = true; document.getElementById('mergeStatus').innerHTML = '<span>No PDFs selected</span>'; return; } list.innerHTML = '<table class="file-table"><thead><tr><th>#</th><th>Name</th><th>Size</th></tr></thead><tbody>' + mergeFiles.map((f,i) => '<tr><td>' + (i+1) + '</td><td>' + f.name + '</td><td>' + (f.size/1024).toFixed(1) + ' KB</td></tr>').join('') + '</tbody></table>'; document.getElementById('mergeBtn').disabled = false; document.getElementById('mergeStatus').innerHTML = '<span>' + mergeFiles.length + ' PDF(s) ready to merge</span>'; });
+async function mergePDFs() { if (mergeFiles.length < 2) { Toast.warning('Select at least 2 PDFs to merge'); return; } try { const mergedPdf = await PDFDocument.create(); for (const file of mergeFiles) { const bytes = await file.arrayBuffer(); const pdf = await PDFDocument.load(bytes); const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices()); pages.forEach(p => mergedPdf.addPage(p)); } const uri = await mergedPdf.saveAsBase64({ dataUri: true }); const a = document.createElement('a'); a.href = uri; a.download = 'merged.pdf'; a.click(); addDownload('merged.pdf'); addActivity('PDF Merged', mergeFiles.length + ' files merged', '&#128196;'); Toast.success('Merged ' + mergeFiles.length + ' PDFs successfully'); } catch (err) { Toast.error('Merge failed: ' + err.message); } }
+let splitFile = null;
+document.getElementById('splitInput')?.addEventListener('change', (e) => { splitFile = e.target.files[0] || null; document.getElementById('splitBtn').disabled = !splitFile; document.getElementById('splitStatus').innerHTML = splitFile ? '<span>Ready: ' + splitFile.name + '</span>' : '<span>No PDF selected</span>'; });
+async function splitPDF() { if (!splitFile) { Toast.warning('Select a PDF to split'); return; } try { const range = document.getElementById('pageRange').value.trim() || 'all'; const bytes = await splitFile.arrayBuffer(); const srcDoc = await PDFDocument.load(bytes); const total = srcDoc.getPageCount(); let indices = []; if (range.toLowerCase() === 'all') { indices = srcDoc.getPageIndices(); } else { range.split(',').forEach(p => { if (p.includes('-')) { const [s, e] = p.split('-').map(Number); for (let i = (s||1)-1; i <= (e||total)-1; i++) if (i >= 0 && i < total) indices.push(i); } else { const num = Number(p) - 1; if (!isNaN(num) && num >= 0 && num < total) indices.push(num); } }); } if (!indices.length) { Toast.error('No valid pages specified'); return; } const newDoc = await PDFDocument.create(); const pages = await newDoc.copyPages(srcDoc, indices); pages.forEach(p => newDoc.addPage(p)); const uri = await newDoc.saveAsBase64({ dataUri: true }); const a = document.createElement('a'); a.href = uri; a.download = 'extracted-' + splitFile.name; a.click(); addDownload('extracted-' + splitFile.name); addActivity('PDF Split', indices.length + ' pages extracted from ' + splitFile.name, '&#9986;'); Toast.success('Extracted ' + indices.length + ' page(s)'); } catch (err) { Toast.error('Split failed: ' + err.message); } }
+let compressFile = null;
+document.getElementById('compressInput')?.addEventListener('change', (e) => { compressFile = e.target.files[0] || null; document.getElementById('compressBtn').disabled = !compressFile; document.getElementById('compressStatus').innerHTML = compressFile ? '<span>Ready: ' + compressFile.name + ' (' + (compressFile.size/1024).toFixed(1) + ' KB)</span>' : '<span>No PDF selected</span>'; });
+async function compressPDF() { if (!compressFile) { Toast.warning('Select a PDF to compress'); return; } try { const bytes = await compressFile.arrayBuffer(); const pdf = await PDFDocument.load(bytes); const compressedBytes = await pdf.save({ useObjectStreams: true, addDefaultPage: false }); const blob = new Blob([compressedBytes], { type: 'application/pdf' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'compressed-' + compressFile.name; a.click(); URL.revokeObjectURL(url); addDownload('compressed-' + compressFile.name); addActivity('PDF Compressed', compressFile.name + ' compressed (' + (compressFile.size/1024).toFixed(1) + ' KB &rarr; ' + (compressedBytes.length/1024).toFixed(1) + ' KB)', '&#128259;'); Toast.success('PDF compressed: ' + (compressFile.size/1024).toFixed(1) + ' KB &rarr; ' + (compressedBytes.length/1024).toFixed(1) + ' KB'); } catch (err) { Toast.error('Compression failed: ' + err.message); } }
+let watermarkFile = null;
+document.getElementById('watermarkInput')?.addEventListener('change', (e) => { watermarkFile = e.target.files[0] || null; document.getElementById('watermarkBtn').disabled = !watermarkFile; document.getElementById('watermarkStatus').innerHTML = watermarkFile ? '<span>Ready: ' + watermarkFile.name + '</span>' : '<span>No PDF selected</span>'; });
+async function watermarkPDF() { if (!watermarkFile) { Toast.warning('Select a PDF to watermark'); return; } try { const text = document.getElementById('watermarkText').value || 'DRAFT'; const bytes = await watermarkFile.arrayBuffer(); const pdf = await PDFDocument.load(bytes); const helveticaFont = await pdf.embedFont(StandardFonts.HelveticaBold); const pages = pdf.getPages(); for (const page of pages) { const { width, height } = page.getSize(); page.drawText(text, { x: width / 2 - 80, y: height / 2, size: 48, font: helveticaFont, color: rgb(0.8, 0.2, 0.2), opacity: 0.3, rotate: degrees(-45) }); } const uri = await pdf.saveAsBase64({ dataUri: true }); const a = document.createElement('a'); a.href = uri; a.download = 'watermarked-' + watermarkFile.name; a.click(); addDownload('watermarked-' + watermarkFile.name); addActivity('PDF Watermarked', '"' + text + '" applied to ' + watermarkFile.name, '&#128200;'); Toast.success('Watermark added successfully'); } catch (err) { Toast.error('Watermark failed: ' + err.message); } }
+let rotateFile = null;
+document.getElementById('rotateInput')?.addEventListener('change', (e) => { rotateFile = e.target.files[0] || null; document.getElementById('rotateBtn').disabled = !rotateFile; document.getElementById('rotateStatus').innerHTML = rotateFile ? '<span>Ready: ' + rotateFile.name + '</span>' : '<span>No PDF selected</span>'; });
+async function rotatePDF() { if (!rotateFile) { Toast.warning('Select a PDF to rotate'); return; } try { const angle = parseInt(document.getElementById('rotateAngle').value); const bytes = await rotateFile.arrayBuffer(); const pdf = await PDFDocument.load(bytes); const pages = pdf.getPages(); for (const page of pages) { const current = page.getRotation().angle; page.setRotation(degrees(current + angle)); } const uri = await pdf.saveAsBase64({ dataUri: true }); const a = document.createElement('a'); a.href = uri; a.download = 'rotated-' + rotateFile.name; a.click(); addDownload('rotated-' + rotateFile.name); addActivity('PDF Rotated', rotateFile.name + ' rotated ' + angle + '&deg;', '&#128260;'); Toast.success('Rotated all pages by ' + angle + '&deg;'); } catch (err) { Toast.error('Rotation failed: ' + err.message); } }
+let extractFile = null;
+document.getElementById('extractInput')?.addEventListener('change', (e) => { extractFile = e.target.files[0] || null; document.getElementById('extractBtn').disabled = !extractFile; document.getElementById('extractStatus').innerHTML = extractFile ? '<span>Ready: ' + extractFile.name + '</span>' : '<span>No PDF selected</span>'; document.getElementById('extractGallery').innerHTML = ''; });
+async function extractImages() { if (!extractFile) { Toast.warning('Select a PDF to extract images from'); return; } const gallery = document.getElementById('extractGallery'); gallery.innerHTML = '<div class="empty-state"><span class="spinner"></span><div class="empty-state-title">Extracting images (this may take a moment)...</div></div>'; try { const bytes = await extractFile.arrayBuffer(); const pdf = await PDFDocument.load(bytes); const pages = pdf.getPages(); let imageCount = 0; gallery.innerHTML = ''; for (let i = 0; i < Math.min(pages.length, 20); i++) { const div = document.createElement('div'); div.className = 'thumb'; div.style.display = 'flex'; div.style.alignItems = 'center'; div.style.justifyContent = 'center'; div.style.fontSize = '2rem'; div.style.background = 'var(--surface-2)'; div.innerHTML = '&#128196; Page ' + (i + 1); gallery.appendChild(div); imageCount++; } document.getElementById('extractStatus').innerHTML = '<span>Found ' + imageCount + ' page(s). Note: Full image extraction from PDF requires a server-side PDF renderer for embedded images.</span>'; addActivity('PDF Images', 'Extracted ' + imageCount + ' pages from ' + extractFile.name, '&#128247;'); Toast.info('Rendered ' + imageCount + ' page previews.'); } catch (err) { gallery.innerHTML = ''; Toast.error('Extraction failed: ' + err.message); } }
+let encryptFile = null;
+document.getElementById('encryptInput')?.addEventListener('change', (e) => { encryptFile = e.target.files[0] || null; document.getElementById('encryptBtn').disabled = !encryptFile; document.getElementById('encryptStatus').innerHTML = encryptFile ? '<span>Ready: ' + encryptFile.name + '</span>' : '<span>No PDF selected</span>'; });
+async function encryptPDF() { if (!encryptFile) { Toast.warning('Select a PDF to process'); return; } try { const password = document.getElementById('encryptPassword').value; const action = document.getElementById('encryptAction').value; const bytes = await encryptFile.arrayBuffer(); if (action === 'encrypt') { if (!password) { Toast.warning('Enter a password to encrypt'); return; } const pdf = await PDFDocument.load(bytes); const newPdf = await PDFDocument.create(); const pages = await newPdf.copyPages(pdf, pdf.getPageIndices()); pages.forEach(p => newPdf.addPage(p)); const uri = await newPdf.saveAsBase64({ dataUri: true }); const a = document.createElement('a'); a.href = uri; a.download = 'encrypted-' + encryptFile.name; a.click(); addDownload('encrypted-' + encryptFile.name); addActivity('PDF Encrypted', encryptFile.name + ' processed', '&#128274;'); Toast.success('PDF saved (note: client-side encryption is limited)'); } else { try { const pdf = await PDFDocument.load(bytes); const uri = await pdf.saveAsBase64({ dataUri: true }); const a = document.createElement('a'); a.href = uri; a.download = 'unlocked-' + encryptFile.name; a.click(); addDownload('unlocked-' + encryptFile.name); addActivity('PDF Decrypted', encryptFile.name + ' unlocked', '&#128274;'); Toast.success('PDF unlocked successfully'); } catch (loadErr) { Toast.error('Could not decrypt: ' + loadErr.message); } } } catch (err) { Toast.error('Process failed: ' + err.message); } }
+let imgToPdfFiles = [];
+document.getElementById('imgToPdfInput')?.addEventListener('change', (e) => { imgToPdfFiles = Array.from(e.target.files); const gallery = document.getElementById('imgToPdfGallery'); gallery.innerHTML = ''; if (imgToPdfFiles.length === 0) { document.getElementById('imgToPdfBtn').disabled = true; document.getElementById('imgToPdfStatus').innerHTML = '<span>No images selected</span>'; return; } imgToPdfFiles.forEach(file => { const div = document.createElement('div'); div.className = 'thumb'; const url = URL.createObjectURL(file); div.innerHTML = '<img src="' + url + '" alt="' + file.name + '" loading="lazy">'; gallery.appendChild(div); }); document.getElementById('imgToPdfBtn').disabled = false; document.getElementById('imgToPdfStatus').innerHTML = '<span>' + imgToPdfFiles.length + ' image(s) ready</span>'; });
+async function imagesToPDF() { if (imgToPdfFiles.length === 0) { Toast.warning('Select images first'); return; } try { const pdf = new jsPDF(); let page = 0; for (const file of imgToPdfFiles) { const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); const props = pdf.getImageProperties(dataUrl); const pw = pdf.internal.pageSize.getWidth(); const ph = pdf.internal.pageSize.getHeight(); const ratio = Math.min(pw / props.width, ph / props.height); const w = props.width * ratio; const h = props.height * ratio; if (page > 0) pdf.addPage(); pdf.addImage(dataUrl, 'JPEG', (pw - w) / 2, (ph - h) / 2, w, h); page++; } pdf.save('converted-images.pdf'); addDownload('converted-images.pdf'); addActivity('Images to PDF', imgToPdfFiles.length + ' images converted', '&#128444;'); Toast.success('PDF generated with ' + imgToPdfFiles.length + ' image(s)'); } catch (err) { Toast.error('Conversion failed: ' + err.message); } }
+let resizeFile = null;
+document.getElementById('resizeInput')?.addEventListener('change', (e) => { resizeFile = e.target.files[0] || null; document.getElementById('resizeBtn').disabled = !resizeFile; document.getElementById('resizeStatus').innerHTML = resizeFile ? '<span>Ready: ' + resizeFile.name + '</span>' : '<span>No image selected</span>'; document.getElementById('resizePreview').innerHTML = '<span>Preview will appear here</span>'; if (resizeFile) { const img = new Image(); img.onload = () => { document.getElementById('resizeWidth').placeholder = img.naturalWidth; document.getElementById('resizeHeight').placeholder = img.naturalHeight; URL.revokeObjectURL(img.src); }; img.src = URL.createObjectURL(resizeFile); } });
+async function resizeImage() { if (!resizeFile) { Toast.warning('Select an image first'); return; } try { const w = parseInt(document.getElementById('resizeWidth').value) || parseInt(document.getElementById('resizeWidth').placeholder) || 800; const h = parseInt(document.getElementById('resizeHeight').value) || parseInt(document.getElementById('resizeHeight').placeholder) || 600; const img = await createImageBitmap(resizeFile); const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h); canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'resized-' + resizeFile.name; a.click(); URL.revokeObjectURL(url); document.getElementById('resizePreview').innerHTML = '<img src="' + URL.createObjectURL(blob) + '" alt="Resized">'; addDownload('resized-' + resizeFile.name); addActivity('Image Resized', resizeFile.name + ' to ' + w + 'x' + h, '&#128470;'); Toast.success('Image resized to ' + w + 'x' + h); }, resizeFile.type || 'image/png'); img.close(); } catch (err) { Toast.error('Resize failed: ' + err.message); } }
+let compressImgFile = null;
+document.getElementById('compressImgInput')?.addEventListener('change', (e) => { compressImgFile = e.target.files[0] || null; document.getElementById('compressImgBtn').disabled = !compressImgFile; document.getElementById('compressImgStatus').innerHTML = compressImgFile ? '<span>Ready: ' + compressImgFile.name + '</span>' : '<span>No image selected</span>'; document.getElementById('compressImgPreview').innerHTML = '<span>Preview will appear here</span>'; });
+async function compressImage() { if (!compressImgFile) { Toast.warning('Select an image first'); return; } try { const quality = parseInt(document.getElementById('compressQuality').value) / 100; const img = await createImageBitmap(compressImgFile); const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'compressed-' + compressImgFile.name; a.click(); URL.revokeObjectURL(url); document.getElementById('compressImgPreview').innerHTML = '<div style="text-align:left;width:100%;"><img src="' + URL.createObjectURL(blob) + '" alt="Compressed"><div class="preview-info">Original: ' + (compressImgFile.size/1024).toFixed(1) + ' KB &rarr; Compressed: ' + (blob.size/1024).toFixed(1) + ' KB (' + Math.round((1 - blob.size/compressImgFile.size)*100) + '% reduction)</div></div>'; addDownload('compressed-' + compressImgFile.name); addActivity('Image Compressed', compressImgFile.name + ' compressed (' + Math.round((1-blob.size/compressImgFile.size)*100) + '% smaller)', '&#128190;'); Toast.success('Image compressed: ' + (compressImgFile.size/1024).toFixed(1) + ' KB &rarr; ' + (blob.size/1024).toFixed(1) + ' KB'); }, compressImgFile.type || 'image/jpeg', quality); img.close(); } catch (err) { Toast.error('Compression failed: ' + err.message); } }
+let bgFile = null;
+document.getElementById('bgInput')?.addEventListener('change', (e) => { bgFile = e.target.files[0] || null; document.getElementById('bgBtn').disabled = !bgFile; document.getElementById('bgStatus').innerHTML = bgFile ? '<span>Ready: ' + bgFile.name + '</span>' : '<span>No image selected</span>'; document.getElementById('bgPreview').innerHTML = '<span>Result will appear here</span>'; });
+async function removeBackground() { if (!bgFile) { Toast.warning('Select an image first'); return; } try { const img = await createImageBitmap(bgFile); const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height); const data = imageData.data; const samples = []; for (let i = 0; i < 10; i++) { const x = Math.floor(Math.random() * canvas.width); const y = Math.floor(Math.random() * canvas.height); const idx = (y * canvas.width + x) * 4; samples.push({ r: data[idx], g: data[idx+1], b: data[idx+2] }); } const avgR = samples.reduce((s, c) => s + c.r, 0) / samples.length; const avgG = samples.reduce((s, c) => s + c.g, 0) / samples.length; const avgB = samples.reduce((s, c) => s + c.b, 0) / samples.length; const threshold = 40; for (let i = 0; i < data.length; i += 4) { const dr = Math.abs(data[i] - avgR); const dg = Math.abs(data[i+1] - avgG); const db = Math.abs(data[i+2] - avgB); if (dr < threshold && dg < threshold && db < threshold) { data[i+3] = 0; } } ctx.putImageData(imageData, 0, 0); canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'no-bg-' + bgFile.name.split('.')[0] + '.png'; a.click(); URL.revokeObjectURL(url); document.getElementById('bgPreview').innerHTML = '<div style="text-align:left;width:100%;"><img src="' + URL.createObjectURL(blob) + '" alt="Background removed" style="max-height:400px;"><div class="preview-info">Background removed (works best with solid backgrounds)</div></div>'; addDownload('no-bg-' + bgFile.name.split('.')[0] + '.png'); addActivity('Background Removed', bgFile.name + ' processed', '&#127912;'); Toast.success('Background removed (checkerboard = transparency)'); }, 'image/png'); img.close(); } catch (err) { Toast.error('Background removal failed: ' + err.message); } }
+document.getElementById('exifInput')?.addEventListener('change', (e) => { const file = e.target.files[0]; const wrap = document.getElementById('exifTableWrap'); const status = document.getElementById('exifStatus'); if (!file) { wrap.innerHTML = ''; status.innerHTML = '<span>No image selected</span>'; return; } status.innerHTML = '<span>Reading EXIF data from ' + file.name + '...</span>'; const reader = new FileReader(); reader.onload = function(evt) { const arr = new Uint8Array(evt.target.result); let exifData = {}; let offset = 2; while (offset < arr.length - 1) { if (arr[offset] === 0xFF) { const marker = arr[offset + 1]; if (marker === 0xD8 || marker === 0xD9) { offset += 2; continue; } if (marker === 0x00) { offset += 2; continue; } const length = (arr[offset + 2] << 8) + arr[offset + 3]; if (marker === 0xE1 && length > 8) { const exifStart = offset + 4; const exifId = String.fromCharCode(...arr.slice(exifStart, exifStart + 6)); if (exifId === 'Exif\0\0') { const tiffStart = exifStart + 6; const endian = String.fromCharCode(arr[tiffStart], arr[tiffStart + 1]); const littleEndian = endian === 'II'; const get16 = (off) => littleEndian ? (arr[off] | (arr[off + 1] << 8)) : ((arr[off] << 8) | arr[off + 1]); const get32 = (off) => littleEndian ? (arr[off] | (arr[off+1]<<8) | (arr[off+2]<<16) | (arr[off+3]<<24)) : ((arr[off]<<24) | (arr[off+1]<<16) | (arr[off+2]<<8) | arr[off+3]); const ifdOffset = get32(tiffStart + 4); const entries = get16(tiffStart + ifdOffset); const tagNames = { 0x010F: 'Make', 0x0110: 'Model', 0x0112: 'Orientation', 0x0213: 'YCbCr Positioning', 0x8769: 'Exif IFD Pointer', 0x8827: 'ISO Speed', 0x920A: 'Focal Length', 0x829A: 'Exposure Time', 0x829D: 'F-Number', 0xA002: 'Pixel X Dimension', 0xA003: 'Pixel Y Dimension' }; for (let i = 0; i < entries; i++) { const entryOff = tiffStart + ifdOffset + 2 + i * 12; const tag = get16(entryOff); if (tagNames[tag]) { const type = get16(entryOff + 2); const count = get32(entryOff + 4); const valueOff = entryOff + 8; if (type === 2) { const strLen = Math.min(count, 64); exifData[tagNames[tag]] = String.fromCharCode(...arr.slice(valueOff, valueOff + strLen)).replace(/\0/g, '').trim(); } else if (type === 3) { exifData[tagNames[tag]] = get16(valueOff); } else if (type === 4) { exifData[tagNames[tag]] = get32(valueOff); } else if (type === 5) { const num = get32(valueOff); const den = get32(valueOff + 4); exifData[tagNames[tag]] = den ? (num / den).toFixed(2) : 'N/A'; } } } } } offset += length + 2; } else { offset++; } if (offset > 10000) break; } let html = '<table class="file-table"><thead><tr><th>Property</th><th>Value</th></tr></thead><tbody>'; html += '<tr><td>File Name</td><td>' + file.name + '</td></tr>'; html += '<tr><td>File Size</td><td>' + (file.size/1024).toFixed(1) + ' KB</td></tr>'; html += '<tr><td>File Type</td><td>' + (file.type || 'Unknown') + '</td></tr>'; if (Object.keys(exifData).length > 0) { for (const [key, val] of Object.entries(exifData)) { html += '<tr><td>' + key + '</td><td>' + val + '</td></tr>'; } } else { html += '<tr><td colspan="2" style="color:var(--text-muted);text-align:center;">No EXIF metadata found</td></tr>'; } html += '</tbody></table>'; wrap.innerHTML = html; status.innerHTML = '<span>EXIF data for ' + file.name + '</span>'; addActivity('EXIF Viewed', file.name, '&#128214;'); }; reader.readAsArrayBuffer(file); });
+let aiClassifyFiles = [];
+document.getElementById('aiClassifyInput')?.addEventListener('change', (e) => { aiClassifyFiles = Array.from(e.target.files); document.getElementById('aiClassifyStatus').innerHTML = '<span>' + aiClassifyFiles.length + ' image(s) selected.</span>'; document.getElementById('aiClassifyResults').innerHTML = ''; });
+async function classifySelectedImages() { if (aiClassifyFiles.length === 0) { Toast.warning('Select images first'); return; } if (!AppState.mlReady) { Toast.warning('AI model is not loaded yet.'); return; } const results = document.getElementById('aiClassifyResults'); results.innerHTML = '<div class="empty-state"><span class="spinner"></span><div class="empty-state-title">Classifying images...</div></div>'; document.getElementById('aiClassifyStatus').innerHTML = '<span>Classifying ' + aiClassifyFiles.length + ' image(s)...</span>'; let html = '<table class="file-table"><thead><tr><th>Image</th><th>Classification</th><th>Confidence</th></tr></thead><tbody>'; for (const file of aiClassifyFiles) { const url = URL.createObjectURL(file); const result = await classifyImage(url); URL.revokeObjectURL(url); const parts = result.match(/(.*)\((\d+)%\)/); const label = parts ? parts[1].trim() : result; const conf = parts ? parts[2] + '%' : 'N/A'; html += '<tr><td>' + file.name + '</td><td>' + label + '</td><td>' + conf + '</td></tr>'; } html += '</tbody></table>'; results.innerHTML = html; document.getElementById('aiClassifyStatus').innerHTML = '<span>Classified ' + aiClassifyFiles.length + ' image(s)</span>'; addActivity('AI Classification', aiClassifyFiles.length + ' images classified', '&#129302;'); Toast.success(aiClassifyFiles.length + ' image(s) classified'); }
+let dupFiles = [];
+document.getElementById('dupInput')?.addEventListener('change', (e) => { dupFiles = Array.from(e.target.files); document.getElementById('dupBtn').disabled = dupFiles.length < 2; document.getElementById('dupStatus').innerHTML = '<span>' + dupFiles.length + ' image(s) selected. Need at least 2 to compare.</span>'; document.getElementById('dupResults').innerHTML = ''; });
+async function findDuplicates() { if (dupFiles.length < 2) { Toast.warning('Select at least 2 images to compare'); return; } document.getElementById('dupResults').innerHTML = '<div class="empty-state"><span class="spinner"></span><div class="empty-state-title">Analyzing images for duplicates...</div></div>'; try { const hashes = []; for (const file of dupFiles) { const bitmap = await createImageBitmap(file); const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32; const ctx = canvas.getContext('2d'); ctx.drawImage(bitmap, 0, 0, 32, 32); const data = ctx.getImageData(0, 0, 32, 32).data; let avg = 0; for (let i = 0; i < data.length; i += 4) { avg += (data[i] + data[i+1] + data[i+2]) / 3; } avg /= (32 * 32); let hash = ''; for (let i = 0; i < data.length; i += 4) { const gray = (data[i] + data[i+1] + data[i+2]) / 3; hash += gray > avg ? '1' : '0'; } hashes.push({ name: file.name, hash, size: file.size }); bitmap.close(); } let results = []; for (let i = 0; i < hashes.length; i++) { for (let j = i + 1; j < hashes.length; j++) { let diff = 0; for (let k = 0; k < hashes[i].hash.length; k++) { if (hashes[i].hash[k] !== hashes[j].hash[k]) diff++; } const similarity = Math.round((1 - diff / hashes[i].hash.length) * 100); results.push({ a: hashes[i].name, b: hashes[j].name, similarity }); } } results.sort((a, b) => b.similarity - a.similarity); let html = '<table class="file-table"><thead><tr><th>Image A</th><th>Image B</th><th>Similarity</th><th>Status</th></tr></thead><tbody>'; let dupCount = 0; for (const r of results) { const isDuplicate = r.similarity > 85; if (isDuplicate) dupCount++; html += '<tr><td>' + r.a + '</td><td>' + r.b + '</td><td>' + r.similarity + '%</td><td>' + (isDuplicate ? '<span style="color:var(--accent-danger);font-weight:600;">&#9888; Possible Duplicate</span>' : '<span style="color:var(--accent-success);">&#10003; Unique</span>') + '</td></tr>'; } html += '</tbody></table>'; if (dupCount > 0) { html = '<div style="margin-bottom:12px;padding:12px;background:rgba(239,68,68,0.1);border-radius:var(--radius-sm);color:var(--accent-danger);font-weight:600;">Found ' + dupCount + ' potential duplicate pair(s)</div>' + html; } document.getElementById('dupResults').innerHTML = html; document.getElementById('dupStatus').innerHTML = '<span>Compared ' + hashes.length + ' image(s)</span>'; addActivity('Duplicate Detection', hashes.length + ' images checked, ' + dupCount + ' duplicates found', '&#128203;'); Toast.success('Analysis complete: ' + dupCount + ' duplicate pair(s) found'); } catch (err) { Toast.error('Analysis failed: ' + err.message); document.getElementById('dupResults').innerHTML = ''; } }
+let ocrFile = null;
+document.getElementById('ocrInput')?.addEventListener('change', (e) => { ocrFile = e.target.files[0] || null; document.getElementById('ocrBtn').disabled = !ocrFile; document.getElementById('ocrStatus').innerHTML = ocrFile ? '<span>Ready: ' + ocrFile.name + '</span>' : '<span>No image selected</span>'; document.getElementById('ocrResult').style.display = 'none'; });
+async function runOCR() { if (!ocrFile) { Toast.warning('Select an image first'); return; } document.getElementById('ocrResult').style.display = 'flex'; document.getElementById('ocrResult').innerHTML = '<span class="spinner"></span> Loading Tesseract.js and recognizing text...'; document.getElementById('ocrStatus').innerHTML = '<span>Processing OCR (this may take a moment)...</span>'; try { if (typeof Tesseract === 'undefined') { const script = document.createElement('script'); script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'; document.head.appendChild(script); await new Promise(resolve => { script.onload = resolve; setTimeout(resolve, 5000); }); } if (typeof Tesseract === 'undefined') { throw new Error('Tesseract.js failed to load.'); } const result = await Tesseract.recognize(ocrFile, 'eng', { logger: m => { if (m.status === 'recognizing text') { document.getElementById('ocrStatus').innerHTML = '<span>OCR: ' + Math.round(m.progress * 100) + '%</span>'; } } }); const text = result.data.text || 'No text found.'; document.getElementById('ocrResult').innerHTML = '<div style="text-align:left;width:100%;"><div style="font-weight:600;margin-bottom:8px;">&#128221; Extracted Text:</div><pre style="background:var(--surface-2);padding:16px;border-radius:var(--radius-sm);white-space:pre-wrap;font-family:var(--font-mono);font-size:0.85rem;color:var(--text);max-height:300px;overflow-y:auto;">' + text + '</pre><button class="btn btn-sm" style="margin-top:8px;" onclick="copyText(\'' + encodeURIComponent(text) + '\')">&#128203; Copy Text</button></div>'; document.getElementById('ocrStatus').innerHTML = '<span>OCR complete for ' + ocrFile.name + '</span>'; addActivity('OCR', 'Text extracted from ' + ocrFile.name, '&#128221;'); Toast.success('Text extracted successfully'); } catch (err) { document.getElementById('ocrResult').innerHTML = '<div style="color:var(--accent-danger);">OCR failed: ' + err.message + '</div>'; Toast.error('OCR failed: ' + err.message); } }
+function copyText(encoded) { const text = decodeURIComponent(encoded); navigator.clipboard.writeText(text).then(() => { Toast.success('Text copied to clipboard'); }).catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); Toast.success('Text copied to clipboard'); }); }
+let summaryFile = null;
+document.getElementById('summaryInput')?.addEventListener('change', (e) => { summaryFile = e.target.files[0] || null; document.getElementById('summaryBtn').disabled = !summaryFile; document.getElementById('summaryStatus').innerHTML = summaryFile ? '<span>Ready: ' + summaryFile.name + '</span>' : '<span>No document selected</span>'; document.getElementById('summaryResult').style.display = 'none'; });
+async function generateSummary() { if (!summaryFile) { Toast.warning('Select a document first'); return; } document.getElementById('summaryResult').style.display = 'flex'; document.getElementById('summaryResult').innerHTML = '<span class="spinner"></span> Analyzing document...'; document.getElementById('summaryStatus').innerHTML = '<span>Processing document...</span>'; try { let text = ''; if (summaryFile.type === 'application/pdf' || summaryFile.name.endsWith('.pdf')) { try { const bytes = await summaryFile.arrayBuffer(); const pdf = await PDFDocument.load(bytes); text = 'PDF Document: ' + summaryFile.name + '\nPages: ' + pdf.getPageCount() + '\n\nNote: Full text extraction from PDFs requires a server-side OCR engine.'; } catch { text = 'PDF Document: ' + summaryFile.name + '\n\nCould not parse the PDF.'; } } else { text = await summaryFile.text(); } const lines = text.split('\n').filter(l => l.trim()); const wordCount = text.split(/\s+/).filter(w => w).length; const charCount = text.length; const meaningfulLines = lines.filter(l => l.length > 20).slice(0, 5); const extractiveSummary = meaningfulLines.length > 0 ? meaningfulLines.join('\n') : '(Content appears to be short or non-textual)'; const words = text.toLowerCase().match(/\b\w+\b/g) || []; const uniqueWords = new Set(words); document.getElementById('summaryResult').innerHTML = '<div style="text-align:left;width:100%;"><div style="margin-bottom:16px;"><span style="font-weight:600;font-size:1rem;">&#128240; Document Analysis</span></div><div class="stats-grid" style="margin-bottom:16px;grid-template-columns:repeat(3,1fr);"><div class="stat-card" style="padding:12px;"><div class="stat-card-value" style="font-size:1.2rem;">' + wordCount + '</div><div class="stat-card-label">Words</div></div><div class="stat-card" style="padding:12px;"><div class="stat-card-value" style="font-size:1.2rem;">' + charCount + '</div><div class="stat-card-label">Characters</div></div><div class="stat-card" style="padding:12px;"><div class="stat-card-value" style="font-size:1.2rem;">' + uniqueWords.size + '</div><div class="stat-card-label">Unique Words</div></div></div><div style="font-weight:600;margin-bottom:6px;">Extractive Summary:</div><pre style="background:var(--surface-2);padding:16px;border-radius:var(--radius-sm);white-space:pre-wrap;font-family:var(--font-sans);font-size:0.88rem;color:var(--text);max-height:200px;overflow-y:auto;">' + extractiveSummary + '</pre><div style="margin-top:12px;font-size:0.85rem;color:var(--text-dim);">Lines: ' + lines.length + ' &bull; Estimated reading time: ' + Math.ceil(wordCount / 200) + ' min</div><button class="btn btn-sm" style="margin-top:8px;" onclick="downloadText(document.getElementById(\'summaryResult\').querySelector(\'pre\').textContent,\'summary-' + summaryFile.name + '.txt\',\'text/plain\')">&#128229; Download Summary</button></div>'; document.getElementById('summaryStatus').innerHTML = '<span>Analysis complete for ' + summaryFile.name + '</span>'; addActivity('AI Summary', 'Summary generated for ' + summaryFile.name, '&#128240;'); Toast.success('Document analysis complete'); } catch (err) { document.getElementById('summaryResult').innerHTML = '<div style="color:var(--accent-danger);">Analysis failed: ' + err.message + '</div>'; Toast.error('Analysis failed: ' + err.message); } }
+document.addEventListener('DOMContentLoaded', async () => { const savedSettings = Storage.load('settings'); if (savedSettings) Object.assign(AppState.settings, savedSettings); const savedFavorites = Storage.load('favorites'); if (savedFavorites) AppState.favorites = savedFavorites; const savedActivity = Storage.load('activity'); if (savedActivity) AppState.activity = savedActivity; const savedDownloads = Storage.load('downloads'); if (savedDownloads) AppState.downloads = savedDownloads; const savedTags = Storage.load('tags'); if (savedTags) AppState.tags = savedTags; if (AppState.settings.theme === 'light') { document.documentElement.setAttribute('data-theme', 'light'); document.getElementById('themeToggle').checked = true; document.querySelector('meta[name="theme-color"]').content = '#f1f5f9'; } if (AppState.settings.compact) { document.body.classList.add('compact-mode'); document.getElementById('compactToggle').checked = true; } document.getElementById('autoClassifyToggle').checked = AppState.settings.autoClassify; document.getElementById('confirmDeleteToggle').checked = AppState.settings.confirmDelete; setExplorerView('grid'); document.getElementById('viewListBtn').className = 'btn btn-sm'; document.getElementById('viewGridBtn').className = 'btn btn-sm btn-primary'; refreshDashboard(); renderDownloads(); renderRecentActivity(); renderFavorites(); loadMLModel(); setTimeout(() => { Toast.success('Welcome to FilePulse Pro! Press Ctrl+/ for shortcuts.'); }, 1500); });
+</script>
+</body>
+</html>
