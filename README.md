@@ -32,7 +32,7 @@ A powerful browser-based File Management and PDF Utility application built entir
 
 > **GitHub Pages**
 
-https://YOUR_GITHUB_USERNAME.github.io/FilePulse-Pro/
+https://leelaprasadpaila.github.io/FilePulse-Pro/
 
 ---
 
